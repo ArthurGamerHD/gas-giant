@@ -8,7 +8,8 @@ exported color map is downsampled to an 8-bit sRGB PNG under
 One exception dominates the runtime: ``ember_dwarf`` is pinned to its shipped
 sim-res 4096 (see ``SIM_RES_OVERRIDES``), which is 16x the pixels of the default
 grid, so budget for it separately -- ``--presets`` a subset, or ``--force-sim-res``
-to override the pin for a fast smoke render (which must NOT be committed).
+to override the pin for a fast smoke render (which is written under
+``--work-dir/forced``, never over the committed asset).
 
 Usage (needs a GL 4.3 context; llvmpipe works):
 
@@ -39,6 +40,7 @@ PRESETS = [
     "ice_giant",
     "neptune",
     "ember_dwarf",
+    "cobalt_gale",
 ]
 
 # Presets whose committed image must NOT use the reduced default sim grid.
@@ -48,6 +50,14 @@ PRESETS = [
 # above LUT index 0.80, measured with scripts/probe_lut_usage.py --keep-detail).
 # The reduced grid understates it badly, so it is always rendered at its shipped
 # resolution regardless of --sim-res.
+#
+# cobalt_gale also ships sim.resolution 4096 but is deliberately NOT listed, and the
+# contrast is the useful part: its composition is an AUTHORED band template with
+# verbatim values, so it is resolution-independent by construction, where
+# ember_dwarf's premise is a resolution-dependent convective fraction. Measured the
+# same way (fraction of the disc above LUT index 0.80, detail on), 1024 -> 4096:
+# cobalt_gale 7.8% -> 8.5% (~1.09x) against ember_dwarf's 13.0% -> 20.2% (~1.55x).
+# Shipping 4096 is therefore NOT on its own a reason to appear here.
 SIM_RES_OVERRIDES = {"ember_dwarf": 4096}
 
 
@@ -70,8 +80,10 @@ def main() -> None:
                     help="sim grid width (reduced for tractable software-GL renders)")
     ap.add_argument("--force-sim-res", action="store_true",
                     help="apply --sim-res even to presets pinned by SIM_RES_OVERRIDES. "
-                         "For fast smoke renders only -- the resulting images "
-                         "misrepresent those presets and must not be committed.")
+                         "For fast smoke renders only: the resulting images "
+                         "misrepresent those presets, so they are written under "
+                         "--work-dir/forced instead of --out-dir and cannot "
+                         "overwrite a committed asset.")
     ap.add_argument("--export-res", type=int, default=2048,
                     help="equirect map width fed to the exporter")
     ap.add_argument("--out-width", type=int, default=2048,
@@ -95,19 +107,27 @@ def main() -> None:
         # ignoring --sim-res makes a fast full-set smoke run impossible.
         sim_res = args.sim_res if args.force_sim_res else SIM_RES_OVERRIDES.get(
             name, args.sim_res)
-        if sim_res != SIM_RES_OVERRIDES.get(name, sim_res):
-            print(f"[{name}] WARNING: --force-sim-res overrides the pinned "
-                  f"{SIM_RES_OVERRIDES[name]}; do NOT commit this image.", flush=True)
+        forced_off_pin = sim_res != SIM_RES_OVERRIDES.get(name, sim_res)
+        # A printed warning is NOT enough to keep the pin structural: on a full-set
+        # run the per-preset progress lines scroll it away, and the misrepresentative
+        # 1024 render would have already overwritten the COMMITTED asset. So divert
+        # the output instead of asking the operator to notice -- "do not commit
+        # this" is enforced by the file not being where the committed images live.
+        out_dir = args.work_dir / "forced" if forced_off_pin else args.out_dir
         params.sim.resolution = sim_res
         params.sim.dev_steps = args.dev_steps
         params.export.width = args.export_res
         sim = Simulation(params)
         work = args.work_dir / name
         run_export(sim, work)
-        dst = args.out_dir / f"{name}.png"
+        dst = out_dir / f"{name}.png"
         _to_srgb8_png(work / "color.png", dst, args.out_width)
         sim.gpu.release()
-        print(f"[{name}] {args.dev_steps} steps @ {sim_res} -> {dst} "
+        note = ""
+        if forced_off_pin:
+            note = (f" [--force-sim-res: pinned {SIM_RES_OVERRIDES[name]} bypassed, "
+                    f"diverted out of {args.out_dir} -- do NOT commit]")
+        print(f"[{name}] {args.dev_steps} steps @ {sim_res} -> {dst}{note} "
               f"({time.perf_counter() - t0:.0f}s)", flush=True)
 
 
