@@ -28,6 +28,7 @@ from enum import StrEnum
 from typing import Any, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.fields import FieldInfo
 
 MAX_BANDS = 40
 
@@ -53,6 +54,7 @@ def pfield(
     adv: bool = False,
     fx: bool = False,
     spread: bool = False,
+    label: str = "",
     description: str = "",
     factory: Any = None,
 ) -> Any:
@@ -64,6 +66,18 @@ def pfield(
     no-shared-singleton form (and matches the ``Field(default_factory=...)`` idiom
     the rest of the tree uses for its nested models).
 
+    ``label`` overrides the widget caption an artist reads while SCANNING the
+    panel. Without it the caption is derived as ``name.replace("_", " ")`` --
+    engine vocabulary for a jargon-named lever (``sor_omega`` reads as "sor
+    omega"), and the tooltip that explains it only appears on hover. Set it for
+    those; leave it empty wherever the derived form is already plain English.
+
+    The field NAME is unaffected -- presets, validator messages and every
+    cross-reference between descriptions keep using it -- and BOTH caption
+    forms stay searchable, so a relabelled field is still found by its old
+    name. Because the caption was the only place the name appeared in the GUI,
+    ``panels._leaf_tip`` puts it back into the tooltip of any relabelled field.
+
     ``fx=True`` marks a DetailParams lever that lives in the DETAIL_FX kernel
     variant: render/detail.py derives its variant-selection predicate AND its
     build-time uniform tripwire (u_<field-name> must exist in the compiled fx
@@ -72,6 +86,25 @@ def pfield(
     for the SPREAD (uniform-detail-coverage) variant. Both are stored only when
     True, like rand -- they never affect the randomize draw order."""
     extra: dict[str, Any] = {"tier": tier.value, "ui": ui, "log": log, "adv": adv}
+    if label != "":
+        # Validated HERE, at import, rather than only in a test: a caption is
+        # display-only, so a bad one produces a plausible-looking widget and a
+        # plausible-looking docs entry with every gate green (label=5 rendered
+        # a slider captioned "5"). '#' is imgui's id separator and silently
+        # hides everything after it; '|' and newlines break the generated
+        # markdown. A test alone would also be skippable in a GUI-extra-free
+        # environment, which is exactly where nobody would notice.
+        # `label.strip() != label` already covers the whitespace-only case (it
+        # strips to "", which differs from the original), so there is no third
+        # clause here.
+        if not isinstance(label, str) or label.strip() != label:
+            raise ValueError(f"pfield(label={label!r}) must be a stripped, non-empty str")
+        if any(c in label for c in "#|\n"):
+            raise ValueError(
+                f"pfield(label={label!r}): '#' is imgui id syntax, '|' and newlines "
+                "break the generated markdown"
+            )
+        extra["label"] = label
     if rand is not None:
         extra["rand"] = list(rand)
     if fx:
@@ -234,6 +267,7 @@ class BandsParams(_Params):
     )
     warp_freq: float = pfield(
         3.0, tier=Tier.RESTART, lo=0.5, hi=16.0, rand=(1.5, 6.0), log=True, adv=True, ui="Bands",
+        label="Band meander scale",
         description="Band-boundary meander spatial frequency",
     )
     detail_amount: float = pfield(
@@ -301,6 +335,7 @@ class BandsParams(_Params):
     )
     detail_freq: float = pfield(
         12.0, tier=Tier.RESTART, lo=2.0, hi=64.0, rand=(6.0, 24.0), log=True, adv=True, ui="Bands",
+        label="Band detail scale",
         description="Small-scale noise spatial frequency",
     )
     template: BandTemplate | None = pfield(
@@ -334,6 +369,7 @@ class SimParams(_Params):
     )
     dt_scale: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.2, hi=3.0, ui="Simulation",
+        label="Time step",
         description="Time-step multiplier (peak jet displacement ~1.2 cells at 1.0)",
     )
     resolution_invariant: bool = pfield(
@@ -474,6 +510,7 @@ class TurbulenceParams(_Params):
     )
     relax_tau: float = pfield(
         350.0, tier=Tier.RESTART, lo=50.0, hi=2000.0, log=True, adv=True, ui="Turbulence",
+        label="Turbulence leash",
         description="Relaxation time (steps) pulling band color/height back toward the stamp",
     )
     replenish_rate: float = pfield(
@@ -484,10 +521,12 @@ class TurbulenceParams(_Params):
     )
     kh_amplitude: float = pfield(
         0.35, tier=Tier.VELOCITY, lo=0.0, hi=2.0, rand=(0.1, 0.8), adv=True, ui="Turbulence",
+        label="Billow strength",
         description="Kelvin-Helmholtz wave amplitude along high-shear band boundaries",
     )
     kh_wavenumber: int = pfield(
         24, tier=Tier.VELOCITY, lo=4, hi=80, rand=(14, 40), adv=True, ui="Turbulence",
+        label="Billow count",
         description="KH billow longitudinal wavenumber",
     )
     belt_replenish: float = pfield(
@@ -1231,6 +1270,7 @@ class WavesParams(_Params):
     )
     festoon_wavenumber: int = pfield(
         12, tier=Tier.RESTART, lo=4, hi=24, rand=(8, 16), ui="Waves",
+        label="Festoon count",
         description="How many festoon plumes fit around the equator "
                     "(higher = more, smaller plumes; the Rossby wavenumber of "
                     "the train)",
@@ -1245,6 +1285,7 @@ class WavesParams(_Params):
     )
     ribbon_wavenumber: int = pfield(
         12, tier=Tier.RESTART, lo=4, hi=30, ui="Waves",
+        label="Ribbon wave count",
         description="Wavenumber of the Saturn-style ribbon wave",
     )
     festoon_hero_strength: float = pfield(
@@ -1259,6 +1300,7 @@ class WavesParams(_Params):
     )
     festoon_hero_wavenumber: int = pfield(
         11, tier=Tier.RESTART, lo=4, hi=24, adv=True, ui="Waves",
+        label="Festoon count (hero)",
         description="Wavenumber of the hero-adjacent festoon train (the "
                     "default deliberately differs from festoon_wavenumber — "
                     "twin wavenumbers read as a mechanical comb)",
@@ -1399,6 +1441,7 @@ class DetailParams(_Params):
     )
     cirrus_fiber_freq: float = pfield(
         6.0, tier=Tier.POST, lo=2.0, hi=24.0, log=True, ui="Detail",
+        label="Cirrus fiber scale",
         description="Strand density of the cirrus fibers: strands across "
                     "each bright-cloud streak half-width. Amplitude is "
                     "attenuated when strands approach the output pixel size "
@@ -1512,16 +1555,19 @@ class SolverParams(_Params):
                     "filaments, slower, and required by the solid-core storm "
                     "levers (prognostic vorticity, v1.6+)")
     poisson_iters: int = pfield(48, tier=Tier.RESTART, lo=8, hi=512, adv=True, ui="Solver",
+        label="Solver accuracy",
         description="Solver accuracy per step: too low leaves smeared, laggy "
                     "swirls; higher is slower with diminishing returns "
                     "(fixed red-black SOR iterations; vorticity mode)")
     sor_omega: float = pfield(1.7, tier=Tier.RESTART, lo=1.0, hi=2.0, adv=True, ui="Solver",
+        label="Solver convergence speed",
         description="Solver convergence speed — leave at 1.7: it changes solve "
                     "time, not the picture, unless set so low the swirls lag "
                     "(SOR over-relaxation factor, must be in (1,2) exclusive; "
                     "vorticity mode)")
     deformation_radius: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=3.14, adv=True, ui="Solver",
+        label="Storm reach (0 = unlimited)",
         description="Storm locality: how far each vortex's swirl reaches. "
                     "Smaller = more local — a dominant hero stirs its own band "
                     "without destabilizing the rest of the map; 0 = off "
@@ -1538,34 +1584,41 @@ class SolverParams(_Params):
                     "localized -- expect to re-tune. No rand.)")
     vort_relax_tau: float = pfield(
         120.0, tier=Tier.RESTART, lo=20.0, hi=2000.0, log=True, adv=True, ui="Solver",
+        label="Flow leash",
         description="How tightly the flow is leashed to the painted jets and "
                     "storms: low = tidy and band-locked, high = free-running "
                     "turbulence that can wander off the template (nudging "
                     "timescale in steps; vorticity mode)")
     vort_hypervisc: float = pfield(1.0, tier=Tier.RESTART, lo=0.0, hi=10.0, adv=True, ui="Solver",
+        label="Fine smoothing",
         description="Fine-scale smoothing: cleans up pixel-level crackle; too "
                     "high blurs away the thinnest filaments (scale-selective "
                     "biharmonic hyperviscosity; vorticity mode)")
     coriolis_f0: float = pfield(2.0, tier=Tier.RESTART, lo=0.0, hi=20.0, adv=True, ui="Solver",
+        label="Rotation strength",
         description="Planet-rotation strength: higher = more, narrower bands "
                     "and flatter storms; lower = fewer, fatter bands (f0 in "
                     "f = f0*sin(lat), sets the Rhines/band scale; vorticity mode)")
     vort_inject: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=5.0, adv=True, ui="Solver",
+        label="Churn strength",
         description="Broadband eddy-vorticity injection amplitude per step; the "
                     "jet shear folds it into filaments (the emergent-turbulence "
                     "source; 0 = off, smooth jets stay zonal). Vorticity mode.")
     vort_inject_scale: float = pfield(0.5, tier=Tier.RESTART, lo=0.1, hi=4.0, adv=True, ui="Solver",
+        label="Churn scale",
         description="Size of the injected churn: higher = finer speckle that "
                     "the shear folds into thin filaments; lower = big blobs "
                     "(injection frequency as a multiple of bands.detail_freq; "
                     "vorticity mode)")
     vort_inject_mask: InjectMask = pfield(
         InjectMask.GLOBAL, tier=Tier.RESTART, adv=True, ui="Solver",
+        label="Churn placement",
         description="Spatial localization of eddy injection: global = churn "
                     "everywhere; belts = cyclonic dark bands only (anticyclonic "
                     "zones stay smooth); shear = jet-shear flanks only (filaments "
                     "where shear is high). Vorticity mode.")
     vort_drag: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=0.3, adv=True, ui="Solver",
+        label="Swirl brake (all scales)",
         description="Global brake on swirling: tames runaway planet-scale swirl "
                     "but also weakens every storm — prefer vort_psi_drag, which "
                     "targets only the oversized swirl (linear Rayleigh drag "
@@ -1573,6 +1626,7 @@ class SolverParams(_Params):
                     "inverse-cascade pileup at large scales; 0 = off; vorticity "
                     "mode)")
     vort_eddy_drag: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=0.3, adv=True, ui="Solver",
+        label="Eddy brake (all scales, jets spared)",
         description="Linear drag fraction on the EDDY vorticity q - <q>_x (the "
                     "deviation from the per-latitude zonal mean) per step. Leaves "
                     "the zonal-mean jets intact, but is FLAT in wavenumber, so it "
@@ -1581,6 +1635,7 @@ class SolverParams(_Params):
                     "vort_psi_drag (scale-selective). Equirect only. 0 = off "
                     "(byte-identical). Vorticity mode.")
     vort_psi_drag: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=20.0, adv=True, ui="Solver",
+        label="Swirl brake (large only)",
         description="Removes oversized planet-scale swirl while PRESERVING "
                     "festoons, band-edge waves, and mid-size vortices — the "
                     "scale-selective brake to reach for before vort_drag or "
@@ -2139,6 +2194,7 @@ class FieldMeta:
     ui: str = ""
     log: bool = False
     adv: bool = False
+    label: str = ""
     rand: list[Any] | None = None
 
     @classmethod
@@ -2149,8 +2205,14 @@ class FieldMeta:
             ui=extra.get("ui", ""),
             log=bool(extra.get("log", False)),
             adv=bool(extra.get("adv", False)),
+            label=str(extra.get("label", "")),
             rand=extra.get("rand"),
         )
+
+    def caption(self, name: str) -> str:
+        """The widget caption for the field named ``name``: the authored
+        ``label`` if there is one, else the derived form."""
+        return self.label or derived_label(name)
 
 
 def field_meta(model: type[BaseModel], field_name: str) -> FieldMeta:
@@ -2160,62 +2222,142 @@ def field_meta(model: type[BaseModel], field_name: str) -> FieldMeta:
 
 
 @dataclass(frozen=True)
-class PfieldLeaf:
-    """One tunable in the tree, addressed by its dotted path."""
+class ParamLeaf:
+    """One leaf of the params tree, addressed by its dotted path.
 
-    path: str          # e.g. "storms.cast.radius" -- unique across the tree
+    ``path`` is unique across a walk that started at the root, which is what
+    ``iter_leaves``/``iter_pfields`` guarantee by construction (they own their
+    own recursion state -- see ``_walk_leaves``).
+    """
+
+    path: str          # e.g. "storms.cast.radius"
     name: str          # the leaf field name alone
     model: type[BaseModel]
-    info: Any          # pydantic FieldInfo
+    info: FieldInfo
 
     @property
     def meta(self) -> FieldMeta:
+        """The typed ``pfield`` metadata. All-default for a non-pfield leaf."""
         return FieldMeta.of(self.info)
 
     @property
     def description(self) -> str:
         return self.info.description or ""
 
+    @property
+    def caption(self) -> str:
+        """The widget caption -- authored ``label`` if any, else derived.
 
-def iter_pfields(
-    model: type[BaseModel] | None = None, prefix: str = "", _depth: int = 0
-) -> Iterator[PfieldLeaf]:
-    """Walk every ``pfield`` leaf under ``model`` (default: the whole tree).
+        Lives here because this is the only type holding BOTH the metadata and
+        the name it belongs to; ``FieldMeta.caption(name)`` has to be trusted to
+        be passed the matching name.
+        """
+        return self.meta.caption(self.name)
 
-    Lives in the params layer rather than in a test or in ``app.panels`` because
-    four callers need it and only one of them may import a GUI: ``app.panels``
-    draws from it, ``scripts/render_slider_examples.py`` generates docs from it
-    headlessly, and the params guard tests walk it. Hand-rolled copies had
-    already drifted apart -- see the two subtleties below, each of which was
-    fixed in some copies and not others, and each of which fails SILENTLY as
-    missing coverage rather than as a red test.
 
-    A leaf counts as a pfield iff its ``json_schema_extra`` carries ``"tier"``.
-    That is deliberately structural: ``GradientStop``, ``PaletteRow`` and
-    ``BandTemplate`` declare their leaves with a plain ``Field()`` and so drop
-    out for free, whereas excluding them BY NAME would turn a future ``pfield``
-    added there into exactly the silent gap this guards against.
+def _walk_leaves(model: type[BaseModel], prefix: str, depth: int) -> Iterator[ParamLeaf]:
+    """Recursion for ``iter_leaves``; private so the path invariant below is a
+    property of the type rather than of how a caller passed ``prefix``."""
+    if depth > 6:  # structural stop; the real tree is 3 deep
+        return
+    for name, info in model.model_fields.items():
+        path = f"{prefix}{name}"
+        nested = False
+        for member in (info.annotation, *get_args(info.annotation)):
+            if isinstance(member, type) and issubclass(member, BaseModel):
+                nested = True
+                yield from _walk_leaves(member, f"{path}.", depth + 1)
+        extra = info.json_schema_extra
+        is_pfield = isinstance(extra, dict) and "tier" in extra
+        # A field that NESTS can still be a tunable in its own right: storms.cast
+        # (list[StormOverride]) and bands.template (BandTemplate | None) both
+        # carry pfield metadata, as do the three gradient-stop lists. Yielding
+        # only non-nesting fields drops exactly those 5 -- which is how two
+        # earlier hand-written wave tables lost storms.cast, the field driving
+        # the entire cast editor.
+        if not nested or is_pfield:
+            yield ParamLeaf(path=path, name=name, model=model, info=info)
 
-    Two subtleties, both load-bearing:
+
+def iter_leaves(model: type[BaseModel] | None = None) -> Iterator[ParamLeaf]:
+    """Every non-model leaf under ``model`` (default: the whole tree), whether
+    or not it is a ``pfield``.
+
+    The unfiltered form exists because the one guard that asserts the COMPLEMENT
+    -- that every tunable leaf declares a ``tier`` -- cannot be built on
+    ``iter_pfields``, which filters on exactly that. Without it a leaf declared
+    with a plain ``Field()`` is invisible to every guard in the repo while
+    ``panels`` still draws it, badge-less and tooltip-less.
+
+    Two traversal subtleties, both load-bearing and both previously fixed in
+    some hand-rolled copies and not others:
 
     * ``get_args`` is walked alongside the bare annotation, because
       ``storms.cast`` is ``list[StormOverride]`` -- which fails ``issubclass``,
       so an annotation-only walk misses all 22 cast levers.
     * Yields by dotted PATH, not by ``(model, name)``. ``poles.north`` and
       ``poles.south`` are two instances of one ``PoleParams`` declaration, so a
-      ``(model, name)`` key silently collapses 5 real leaves. Callers that want
+      ``(model, name)`` key silently collapses 5 real leaves. Callers wanting
       one entry per DECLARATION should dedupe on ``(leaf.model, leaf.name)``
       themselves, where the intent is visible.
+
+    Both are pinned by ``tests/unit/test_params.py`` -- they degrade into
+    quietly walking FEWER leaves, which no consumer can detect on its own.
     """
-    if model is None:
-        model = PlanetParams
-    if _depth > 6:  # structural stop; the real tree is 3 deep
-        return
-    for name, info in model.model_fields.items():
-        path = f"{prefix}{name}"
-        for member in (info.annotation, *get_args(info.annotation)):
-            if isinstance(member, type) and issubclass(member, BaseModel):
-                yield from iter_pfields(member, f"{path}.", _depth + 1)
-        extra = info.json_schema_extra
+    return _walk_leaves(model if model is not None else PlanetParams, "", 0)
+
+
+def iter_pfields(model: type[BaseModel] | None = None) -> Iterator[ParamLeaf]:
+    """Every ``pfield`` leaf under ``model`` (default: the whole tree).
+
+    Lives in the params layer, rather than in a test or in ``app.panels``, so
+    that every layer can reach it -- the doc generator
+    (``scripts/render_slider_examples.py``) runs headless and must never import
+    a GUI. Today the callers are the params and caption guard tests; ``panels``
+    and the doc generator still carry their own draw-order recursions, which
+    yield sections as well as leaves and so are not drop-in replaceable.
+    Folding them in is worth doing and is NOT done here.
+
+    A leaf counts as a ``pfield`` iff its ``json_schema_extra`` carries
+    ``"tier"``. That is deliberately structural: ``GradientStop``,
+    ``PaletteRow`` and ``BandTemplate`` declare their leaves with a plain
+    ``Field()`` and so drop out for free, whereas excluding them BY NAME would
+    turn a future ``pfield`` added there into exactly the silent gap this
+    guards against.
+    """
+    for leaf in iter_leaves(model):
+        extra = leaf.info.json_schema_extra
         if isinstance(extra, dict) and "tier" in extra:
-            yield PfieldLeaf(path=path, name=name, model=model, info=info)
+            yield leaf
+
+
+#: Back-compat alias; ``ParamLeaf`` covers non-pfield leaves too.
+PfieldLeaf = ParamLeaf
+
+
+def derived_label(name: str) -> str:
+    """The pre-label caption: shown when no ``label`` is authored, and ALWAYS
+    kept in the search haystack so a relabelled field stays findable by the
+    name it used to display. Do not assume the unconditional call in
+    ``panels._haystack`` is redundant -- dropping it un-finds 21 of the 22
+    relabelled fields."""
+    return name.replace("_", " ")
+
+
+def field_label(name: str, info: Any) -> str:
+    """The caption to show for a field: its authored ``label`` if it has one,
+    otherwise the derived ``name.replace("_", " ")``.
+
+    Lives in the PARAMS layer, not in ``app.panels``, because the doc generator
+    needs it too and deliberately does not import panels --
+    ``scripts/render_slider_examples.py`` inlines mirrors of panels' pure
+    helpers, since panels imports imgui_bundle at module load and the
+    headless/CLI env has no GUI extra. The derivation had NINE call sites:
+    three in panels and six in the generator. A helper in panels could only
+    ever have removed the three, leaving the doc free to drift from the app.
+
+    Callers that already hold a ``FieldMeta`` should call ``meta.caption(name)``
+    instead -- this convenience form builds a throwaway one, which is waste in a
+    per-frame draw loop.
+    """
+    return FieldMeta.of(info).caption(name)

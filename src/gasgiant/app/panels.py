@@ -36,8 +36,47 @@ from gasgiant.params.model import (
     CAST_LEVER_FIELDS,
     FieldMeta,
     PlanetParams,
+    derived_label,
+    field_label,
     hero_latitude_cap,
 )
+
+# Search haystacks, built once per field.
+#
+# Keyed on (name, id(info)), not id(info) alone: the cached text embeds `name`,
+# so a FieldInfo reachable under two names would otherwise serve the first
+# name's text and un-find the field under the second. The value also holds a
+# strong reference to the FieldInfo, which is what makes the id() half of the
+# key safe -- the object cannot be collected while cached, so its id cannot be
+# recycled onto a different one.
+_HAYSTACKS: dict[tuple[str, int], str] = {}
+
+
+_HAYSTACK_KEEPALIVE: list[FieldInfo] = []
+
+
+def _haystack(name: str, info: FieldInfo) -> str:
+    """Lower-cased search text for a leaf. Cached: every component is a
+    class-level constant, and this runs for all 226 leaves on every frame that
+    a search is active.
+
+    Carries BOTH caption forms, never just the shown one. The spaced field name
+    is the only thing matching a search for "vort psi", so an authored label
+    that REPLACED it un-finds 21 of the 22 relabelled fields (only
+    deformation_radius survives, because its own description happens to contain
+    the phrase). For an unlabelled field the two are equal and the haystack
+    simply repeats the term -- harmless, not a bug.
+    """
+    key = (name, id(info))
+    text = _HAYSTACKS.get(key)
+    if text is None:
+        text = (
+            f"{name} {derived_label(name)} {field_label(name, info)} "
+            f"{info.description or ''}"
+        ).lower()
+        _HAYSTACKS[key] = text
+        _HAYSTACK_KEEPALIVE.append(info)
+    return text
 
 
 def _bounds(info: FieldInfo) -> tuple[float | None, float | None]:
@@ -295,9 +334,7 @@ def _leaf_visible(name: str, info: FieldInfo, doc: dict[str, Any], state: PanelS
         if name == "cast" and doc.get(name):
             return True
         return _advanced_visible(info, state)
-    label = name.replace("_", " ")
-    haystack = f"{name} {label} {info.description or ''}".lower()
-    return query in haystack
+    return query in _haystack(name, info)
 
 
 def _subtree_has_match(model: type[BaseModel], doc: dict[str, Any], state: PanelState) -> bool:
@@ -453,6 +490,29 @@ def _draw_emission_aurora_note(emission_doc: dict[str, Any]) -> None:
     if emission_doc.get("aurora_strength", 0.0) <= 0.0:
         return
     imgui.text_colored(imgui.ImVec4(*_MODIFIED_COLOR), _AURORA_PREVIEW_NOTE)
+
+
+def _leaf_tip(name: str, info: FieldInfo, meta: FieldMeta) -> str:
+    """The tooltip text for a leaf: its description, prefixed with the field
+    NAME when an authored caption has displaced it.
+
+    Takes the caller's ``meta`` rather than rebuilding one. Three of the four
+    call sites are per-frame draw loops that already hold it; the bespoke
+    ``kind`` combo in the cast list builds one inline, because it draws a field
+    it does not otherwise walk.
+
+    The caption used to be the only place the name appeared in the GUI, and
+    other text still addresses fields by name -- eight descriptions cross-
+    reference a now-relabelled field ("prefer vort_psi_drag"), and validator
+    errors surface through toasts naming the field ("sor_omega=2.0 must be
+    strictly in (1.0, 2.0)"). Without this, dragging "Solver convergence
+    speed" to its max reports an error about a string that appears nowhere on
+    screen.
+    """
+    desc = info.description or ""
+    if not meta.label:
+        return desc
+    return f"{name}\n\n{desc}" if desc else name
 
 
 def _draw_help_marker(text: str) -> None:
@@ -702,8 +762,8 @@ def _draw_leaf(
         return False, False
 
     value = doc[name]
-    label = name.replace("_", " ")
     meta = FieldMeta.of(info)
+    label = meta.caption(name)
     lo, hi = _bounds(info)
     changed = False
     committed = False
@@ -724,7 +784,7 @@ def _draw_leaf(
         # disguise) -- the tooltip still explains the field.
         imgui.text_disabled(f"{label}: {value} — set in the Export... dialog")
         # Must stay above the early return: item_tooltip reads the last-drawn item.
-        item_tooltip(info.description)
+        item_tooltip(_leaf_tip(name, info, meta))
         imgui.pop_id()
         return False, False
 
@@ -784,7 +844,7 @@ def _draw_leaf(
     if kind in _SINGLE_ITEM_KINDS:
         committed = imgui.is_item_deactivated_after_edit()
 
-    item_tooltip(info.description)
+    item_tooltip(_leaf_tip(name, info, meta))
 
     # Right-click affordances, tied to the leaf's last-drawn item.
     #
@@ -1035,8 +1095,8 @@ def _draw_cast_field(
     to 0,0), and lock-for-randomize is meaningless (cast carries no ``rand``).
     The pfield description tooltip is kept. Returns ``(changed, committed)``."""
     value = row[name]
-    label = name.replace("_", " ")
     meta = FieldMeta.of(info)
+    label = meta.caption(name)
     lo, hi = _bounds(info)
     ann = info.annotation
     changed = committed = False
@@ -1070,7 +1130,7 @@ def _draw_cast_field(
         imgui.text_disabled(f"{label}: {value!r}")
     if kind in _SINGLE_ITEM_KINDS:
         committed = imgui.is_item_deactivated_after_edit()
-    item_tooltip(info.description)
+    item_tooltip(_leaf_tip(name, info, meta))
     imgui.pop_id()
     return changed, committed
 
@@ -1140,7 +1200,12 @@ def _draw_cast_list(
         if clicked:
             state.selected_cast = i
         cur = kinds.index(row["kind"]) if row["kind"] in kinds else 0
-        c, idx = imgui.combo("kind", cur, kinds)
+        kind_info = StormOverride.model_fields["kind"]
+        c, idx = imgui.combo(field_label("kind", kind_info), cur, kinds)
+        # `kind` is drawn bespoke here and skipped by _draw_flat_model_fields
+        # below, so without this its description is the one cast-lever
+        # description the GUI never shows anywhere.
+        item_tooltip(_leaf_tip("kind", kind_info, FieldMeta.of(kind_info)))
         if c:
             row["kind"] = kinds[idx]
             changed = True
