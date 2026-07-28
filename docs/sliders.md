@@ -69,7 +69,7 @@ _Boolean toggle (GUI checkbox) &mdash; documented as text; no rendered example._
 
 `sim.dt_scale` &mdash; range **0.2 to 3**, default **1**, tier `restart`.
 
-Time-step multiplier (peak jet displacement ~1.2 cells at 1.0)
+How far the flow moves per sim step. Higher = faster development but a coarser, less stable solve (time-step multiplier; peak jet displacement ~1.2 cells at 1.0)
 
 <table><tr>
 <td align="center"><img src="img/sliders/sim__dt_scale__lo.jpg" width="320"><br><sub>low &middot; 0.2</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/sim__dt_scale__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -82,7 +82,7 @@ Time-step multiplier (peak jet displacement ~1.2 cells at 1.0)
 
 `solver.baroclinic.baro_steps_per_update` &mdash; range **10 to 1000**, default **150**, tier `restart`.
 
-Internal pacing of the baroclinic storm generator — leave at default (baroclinic steps per source refresh; fixed cadence, no rand)
+Internal pacing of the baroclinic storm generator; leave at default (baroclinic steps per source refresh; fixed cadence, no rand)
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -90,7 +90,7 @@ _Passed to the Blender importer / controls the output file, not the texture appe
 
 `solver.vort_inject_mask` &mdash; dropdown, one of `global` / `belts` / `shear`, default **`global`**, tier `restart`.
 
-Spatial localization of eddy injection: global = churn everywhere; belts = cyclonic dark bands only (anticyclonic zones stay smooth); shear = jet-shear flanks only (filaments where shear is high). Vorticity mode.
+Where the injected churn is allowed to land. global = everywhere; belts = the cyclonic dark bands only, leaving the anticyclonic zones smooth; shear = the jet-shear flanks only, so filaments form where shear is high. The mask multiplies vort_inject per pixel and is NOT normalized by how much it covers, so a wider mask puts more total churn in at the same amplitude — belts lets through several times what shear does, so retune vort_inject DOWN when you widen it (spatial localization of eddy injection). Vorticity mode.
 
 _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
@@ -110,7 +110,7 @@ _Rendered against the `vorticity` solver baseline (inert under the default kinem
 
 `solver.vort_inject` &mdash; range **0 to 5**, default **0**, tier `restart`.
 
-Broadband eddy-vorticity injection amplitude per step; the jet shear folds it into filaments (the emergent-turbulence source; 0 = off, smooth jets stay zonal). Vorticity mode.
+Feeds fresh churn into the flow every step, which the jet shear then folds into filaments. Higher = busier, more turbulent bands; 0 = off, and the jets stay smooth and east-west (broadband eddy-vorticity injection amplitude per step — the emergent-turbulence source). Vorticity mode.
 
 _Rendered against the `vorticity` solver baseline (inert under the default kinematic solver)._
 
@@ -122,7 +122,7 @@ _Rendered against the `vorticity` solver baseline (inert under the default kinem
 
 `solver.vort_eddy_drag` &mdash; range **0 to 0.3**, default **0**, tier `restart`.
 
-Linear drag fraction on the EDDY vorticity q - <q>_x (the deviation from the per-latitude zonal mean) per step. Leaves the zonal-mean jets intact, but is FLAT in wavenumber, so it damps medium eddies (festoons, band-edge waves) as hard as the gravest-mode swirl -> over-flattens the field. Prefer vort_psi_drag (scale-selective). Equirect only. 0 = off (byte-identical). Vorticity mode.
+Brake on everything that is not part of the east-west jets. It leaves the jets themselves intact, but damps mid-size features (festoons, band-edge waves) as hard as the gravest-mode planet-scale swirl, so the field over-flattens — prefer vort_psi_drag, which is scale-selective. 0 = off (byte-identical). Equirect only (linear drag fraction per step on the EDDY vorticity q - <q>_x, the deviation from the per-latitude zonal mean; FLAT in wavenumber). Vorticity mode.
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><img src="img/sliders/solver__vort_eddy_drag__hi.jpg" width="320"><br><sub>high &middot; 0.3</sub></td>
@@ -132,7 +132,7 @@ Linear drag fraction on the EDDY vorticity q - <q>_x (the deviation from the per
 
 `solver.baroclinic.enabled` &mdash; toggle (on/off), default **`False`**, tier `restart`.
 
-Inject the evolving baroclinic vorticity source into the vorticity solver (adds physically-grounded mid-latitude storms; requires solver type=vorticity). Off = plain v1.6. No rand: randomize() must never silently enable it.
+Adds physically-grounded mid-latitude storms, grown by a baroclinic instability model, in addition to the hand-seeded ones. Off = plain v1.6; requires solver type=vorticity (injects the evolving baroclinic vorticity source into the solver). No rand: randomize() must never silently enable it.
 
 _Boolean toggle (GUI checkbox) &mdash; documented as text; no rendered example._
 
@@ -204,7 +204,7 @@ _Passed to the Blender importer / controls the output file, not the texture appe
 
 `solver.deformation_radius` &mdash; range **0 to 3.14**, default **0**, tier `restart`.
 
-Storm locality: how far each vortex's swirl reaches. Smaller = more local — a dominant hero stirs its own band without destabilizing the rest of the map; 0 = off (infinite reach, plain 2D, byte-identical). Values in the (0, 0.05) rad band are rejected (degenerate solve). (Physics: Rossby deformation radius L_d in RADIANS, 1 rad = 57.3 deg; vorticity mode. Screens the inversion to (nabla^2 - 1/L_d^2)psi = omega — equivalent-barotropic / 1.5-layer reduced gravity — so induced velocity decays ~exp(-r/L_d) beyond L_d instead of the 2D ~1/r tail; real Jupiter has L_d << the GRS. With screening on, the advected q is equivalent-barotropic QGPV, so vortex/inject/relax strengths tuned for the plain 2D path read weaker and more localized -- expect to re-tune. No rand.)
+Storm locality — how far each vortex's swirl reaches. Smaller = more local — a dominant hero stirs its own band without destabilizing the rest of the map; 0 = off (infinite reach, plain 2D, byte-identical). Values in the (0, 0.05) rad band are rejected (degenerate solve). (Physics: Rossby deformation radius L_d in RADIANS, 1 rad = 57.3 deg; vorticity mode. Screens the inversion to (nabla^2 - 1/L_d^2)psi = omega — equivalent-barotropic / 1.5-layer reduced gravity — so induced velocity decays ~exp(-r/L_d) beyond L_d instead of the 2D ~1/r tail; real Jupiter has L_d << the GRS. With screening on, the advected q is equivalent-barotropic QGPV, so vortex/inject/relax strengths tuned for the plain 2D path read weaker and more localized -- expect to re-tune. No rand.)
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><img src="img/sliders/solver__deformation_radius__hi.jpg" width="320"><br><sub>high &middot; 3.14</sub></td>
@@ -244,7 +244,7 @@ _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
 `solver.baroclinic.update_every` &mdash; range **1 to 512**, default **32**, tier `restart`.
 
-Internal pacing of the baroclinic storm generator — leave at default (main-solver steps between source refreshes; fixed cadence, no rand)
+Internal pacing of the baroclinic storm generator; leave at default (main-solver steps between source refreshes; fixed cadence, no rand)
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -263,7 +263,7 @@ _Passed to the Blender importer / controls the output file, not the texture appe
 
 `bands.detail_freq` &mdash; range **2 to 64**, default **12**, tier `restart`, log scale.
 
-Small-scale noise spatial frequency
+Size of the fine color mottling inside each band (the amount of it is bands.detail_amount). Higher = finer grain; lower = broader blotches (small-scale noise spatial frequency)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__detail_freq__lo.jpg" width="320"><br><sub>low &middot; 2</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 14</sub></td><td align="center"><img src="img/sliders/bands__detail_freq__hi.jpg" width="320"><br><sub>high &middot; 64</sub></td>
@@ -273,7 +273,7 @@ Small-scale noise spatial frequency
 
 `bands.warp_freq` &mdash; range **0.5 to 16**, default **3**, tier `restart`, log scale.
 
-Band-boundary meander spatial frequency
+How often the band boundaries wander as they wrap the planet. Higher = tighter, more frequent meanders (band-boundary meander spatial frequency)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__warp_freq__lo.jpg" width="320"><br><sub>low &middot; 0.5</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 3.5</sub></td><td align="center"><img src="img/sliders/bands__warp_freq__hi.jpg" width="320"><br><sub>high &middot; 16</sub></td>
@@ -293,7 +293,7 @@ Whole-belt fade (the SEB-fade epoch): blends the target band's stamped color tow
 
 `bands.contrast_envelope` &mdash; range **0 to 1**, default **0**, tier `restart`.
 
-Banding contrast collapse poleward of ~45 deg toward mottle (the real latitude-contrast profile)
+Fades the banding out toward the poles, into mottled texture. Higher = a more complete fade; 0 = off, bands stay crisp all the way up. The latitude window is fixed, so this sets how far the fade goes, not how far down it reaches (contrast collapse poleward of ~45 deg — the real latitude-contrast profile)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__contrast_envelope__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.25</sub></td><td align="center"><img src="img/sliders/bands__contrast_envelope__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -303,7 +303,7 @@ Banding contrast collapse poleward of ~45 deg toward mottle (the real latitude-c
 
 `bands.count` &mdash; range **2 to 40**, default **14**, tier `restart`.
 
-Number of zones+belts pole to pole
+How many bands circle the planet from pole to pole, counting zones and belts together. Higher = narrower bands
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__count__lo.jpg" width="320"><br><sub>low &middot; 2</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 16</sub></td><td align="center"><img src="img/sliders/bands__count__hi.jpg" width="320"><br><sub>high &middot; 40</sub></td>
@@ -313,7 +313,7 @@ Number of zones+belts pole to pole
 
 `bands.detail_amount` &mdash; range **0 to 0.5**, default **0.1**, tier `restart`.
 
-Small-scale color-index noise amplitude
+How much fine color mottling breaks up each band. Higher = a grainier, less flat band; 0 = flat color (small-scale color-index noise amplitude)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__detail_amount__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.12</sub></td><td align="center"><img src="img/sliders/bands__detail_amount__hi.jpg" width="320"><br><sub>high &middot; 0.5</sub></td>
@@ -323,7 +323,7 @@ Small-scale color-index noise amplitude
 
 `bands.edge_diversity` &mdash; range **0 to 1**, default **0**, tier `restart`.
 
-Per-edge softness variation: some band edges diffuse, some sharp (uniform edges are a procedural tell)
+Varies softness edge by edge, so some band edges are diffuse and some sharp. Higher = a wider spread of edge styles; 0 = off, every edge shares one softness (per-edge softness variation; uniform edges are a procedural tell)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__edge_diversity__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.55</sub></td><td align="center"><img src="img/sliders/bands__edge_diversity__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -333,7 +333,7 @@ Per-edge softness variation: some band edges diffuse, some sharp (uniform edges 
 
 `bands.edge_softness` &mdash; range **0.001 to 0.1**, default **0.012**, tier `restart`, log scale.
 
-Half-width of band-edge transitions, radians of latitude (1 rad = 57.3 deg; default 0.012 rad is about 0.7 deg)
+How sharply one band gives way to the next. Higher = softer, more diffuse edges; low = a hard line (half-width of the band-edge transition, in radians of latitude; 1 rad = 57.3 deg, and the default 0.012 rad is about 0.7 deg)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__edge_softness__lo.jpg" width="320"><br><sub>low &middot; 0.001</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.012</sub></td><td align="center"><img src="img/sliders/bands__edge_softness__hi.jpg" width="320"><br><sub>high &middot; 0.1</sub></td>
@@ -351,7 +351,7 @@ _Optional field: the GUI shows a **pin** checkbox &mdash; unpinned (None) keeps 
 
 `bands.faded_sector` &mdash; range **0 to 1**, default **0**, tier `restart`.
 
-SEB-fade: one belt gets a pale desaturated sector spanning ~100 degrees of longitude
+One belt gets a pale, desaturated sector spanning ~100 degrees of longitude. Higher = a more washed-out sector; 0 = off. Target band = faded_band_index, or the widest low/mid belt when that is unset (the SEB-fade epoch)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__faded_sector__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.55</sub></td><td align="center"><img src="img/sliders/bands__faded_sector__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -361,7 +361,7 @@ SEB-fade: one belt gets a pale desaturated sector spanning ~100 degrees of longi
 
 `bands.hue_jitter` &mdash; range **0 to 0.15**, default **0**, tier `restart`.
 
-Per-band color-index offset along the palette (NEB-orange vs SEB-brown variation); seeded independently of the band layout
+Nudges each band's color along the palette, so neighbors do not share one hue. Higher = more variety band to band; 0 = off (per-band color-index offset — NEB-orange vs SEB-brown variation; seeded independently of the band layout)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__hue_jitter__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.04</sub></td><td align="center"><img src="img/sliders/bands__hue_jitter__hi.jpg" width="320"><br><sub>high &middot; 0.15</sub></td>
@@ -371,7 +371,7 @@ Per-band color-index offset along the palette (NEB-orange vs SEB-brown variation
 
 `bands.lane_density` &mdash; range **0 to 1**, default **0**, tier `velocity`.
 
-Thin dark lane lines at jet cores, drawn analytically at derive time (a 1-3 px line cannot survive the sim grid)
+Thin dark lane lines running along the jet cores. Higher = more of them, though each lane's darkness is seeded and does not change; 0 = off (drawn analytically at derive time — a 1-3 px line cannot survive the sim grid)
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><img src="img/sliders/bands__lane_density__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -381,7 +381,7 @@ Thin dark lane lines at jet cores, drawn analytically at derive time (a 1-3 px l
 
 `bands.value_contrast` &mdash; range **0 to 2**, default **1**, tier `restart`.
 
-Zone/belt brightness separation multiplier
+How far apart the pale zones and dark belts sit in brightness. Higher = a bolder, higher-contrast planet; 1.0 = the palette's own separation (zone/belt brightness multiplier; inert on the band-template path)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__value_contrast__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.1</sub></td><td align="center"><img src="img/sliders/bands__value_contrast__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -391,7 +391,7 @@ Zone/belt brightness separation multiplier
 
 `bands.variance_amount` &mdash; range **0 to 0.3**, default **0**, tier `restart`.
 
-Within-band longitudinal color drift (real belts hold several hues at once, varying slowly with longitude)
+Slow color drift along the length of each band. Higher = a band that lightens and darkens as it wraps the planet; 0 = off. For a hue-only drift at constant brightness use hue_variance (within-band longitudinal drift along the palette, varying slowly with longitude)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__variance_amount__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.18</sub></td><td align="center"><img src="img/sliders/bands__variance_amount__hi.jpg" width="320"><br><sub>high &middot; 0.3</sub></td>
@@ -401,7 +401,7 @@ Within-band longitudinal color drift (real belts hold several hues at once, vary
 
 `bands.warp_amount` &mdash; range **0 to 0.3**, default **0.035**, tier `restart`.
 
-Band-boundary meander amplitude, radians of latitude (1 rad = 57.3 deg; default 0.035 rad is about 2 deg)
+How far the band boundaries wander north and south. Higher = wavier, less ruler-straight bands; 0 = perfectly straight (band-boundary meander amplitude, in radians of latitude; 1 rad = 57.3 deg, and the default 0.035 rad is about 2 deg)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__warp_amount__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.04</sub></td><td align="center"><img src="img/sliders/bands__warp_amount__hi.jpg" width="320"><br><sub>high &middot; 0.3</sub></td>
@@ -411,7 +411,7 @@ Band-boundary meander amplitude, radians of latitude (1 rad = 57.3 deg; default 
 
 `bands.width_jitter` &mdash; range **0 to 1**, default **0.35**, tier `restart`.
 
-Randomness of band width distribution
+How much the band widths vary from one another. Higher = a less regular, more natural mix of wide and narrow bands; 0 = every band the same size — equal-area, so the polar ones still read taller on a flat map (randomness of the band width distribution)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__width_jitter__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.4</sub></td><td align="center"><img src="img/sliders/bands__width_jitter__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -421,7 +421,7 @@ Randomness of band width distribution
 
 `bands.width_tail` &mdash; range **0 to 1**, default **0**, tier `restart`.
 
-Heavier-tailed band width distribution (real maps mix very broad zones with thin strips)
+Pushes the band widths toward extremes, mixing very broad bands with thin ones. Higher = a more lopsided mix; 0 = off (a heavier-tailed width distribution — real maps mix very broad zones with thin strips)
 
 <table><tr>
 <td align="center"><img src="img/sliders/bands__width_tail__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.35</sub></td><td align="center"><img src="img/sliders/bands__width_tail__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -434,7 +434,7 @@ Heavier-tailed band width distribution (real maps mix very broad zones with thin
 
 `jets.equatorial_speed` &mdash; range **-3 to 4**, default **1.6**, tier `velocity`.
 
-Equatorial superrotation jet peak speed (negative = retrograde, flowing against the planet's rotation)
+Peak speed of the equatorial jet. Higher = a faster, more sheared equator; negative = retrograde, flowing against the planet's rotation (the superrotation jet)
 
 <table><tr>
 <td align="center"><img src="img/sliders/jets__equatorial_speed__lo.jpg" width="320"><br><sub>low &middot; -3</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.6</sub></td><td align="center"><img src="img/sliders/jets__equatorial_speed__hi.jpg" width="320"><br><sub>high &middot; 4</sub></td>
@@ -444,7 +444,7 @@ Equatorial superrotation jet peak speed (negative = retrograde, flowing against 
 
 `jets.equatorial_width` &mdash; range **0.03 to 0.4**, default **0.12**, tier `velocity`.
 
-Equatorial jet half-width, radians of latitude (1 rad = 57.3 deg; default 0.12 rad is about 7 deg)
+How far the equatorial jet spreads in latitude. Higher = a broader, gentler equator (jet half-width, in radians of latitude; 1 rad = 57.3 deg, and the default 0.12 rad is about 7 deg)
 
 <table><tr>
 <td align="center"><img src="img/sliders/jets__equatorial_width__lo.jpg" width="320"><br><sub>low &middot; 0.03</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.12</sub></td><td align="center"><img src="img/sliders/jets__equatorial_width__hi.jpg" width="320"><br><sub>high &middot; 0.4</sub></td>
@@ -484,7 +484,7 @@ Equatorward-flank jet center offset, in units of the hero CORE RADIUS (jet cente
 
 `jets.hero_bracket_north_width` &mdash; range **0.1 to 2**, default **0.8**, tier `restart`.
 
-Equatorward-flank jet gaussian half-width, in units of the hero core radius
+How wide the equatorward-flank jet spreads. Measured in units of the hero core radius, so it tracks storm size (gaussian half-width)
 
 <table><tr>
 <td align="center"><sub>low &middot; 0.1<br>(not rendered)</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.8</sub></td><td align="center"><sub>high &middot; 2<br>(not rendered)</sub></td>
@@ -504,7 +504,7 @@ Carve-and-impose hero jet override: poleward-flank jet strength (positive = east
 
 `jets.hero_bracket_south_offset` &mdash; range **-4 to 0**, default **-1**, tier `restart`.
 
-Poleward-flank jet center offset, in units of the hero core radius (jet center latitude = hero_latitude + this * hero_radius)
+How far the poleward-flank jet sits from the storm center. Measured in units of the hero CORE RADIUS, so the bracket keeps straddling the storm as it is resized (jet center latitude = hero_latitude + this * hero_radius)
 
 <table><tr>
 <td align="center"><sub>low &middot; -4<br>(not rendered)</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; -1</sub></td><td align="center"><sub>high &middot; 0<br>(not rendered)</sub></td>
@@ -514,7 +514,7 @@ Poleward-flank jet center offset, in units of the hero core radius (jet center l
 
 `jets.hero_bracket_south_width` &mdash; range **0.1 to 2**, default **0.8**, tier `restart`.
 
-Poleward-flank jet gaussian half-width, in units of the hero core radius
+How wide the poleward-flank jet spreads. Measured in units of the hero core radius, so it tracks storm size (gaussian half-width)
 
 <table><tr>
 <td align="center"><sub>low &middot; 0.1<br>(not rendered)</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.8</sub></td><td align="center"><sub>high &middot; 2<br>(not rendered)</sub></td>
@@ -564,7 +564,7 @@ Half-width of the local zonal jet, radians of latitude (1 rad = 57.3 deg; defaul
 
 `jets.polar_decay` &mdash; range **0 to 1**, default **0.5**, tier `velocity`.
 
-How strongly jet amplitudes decay toward the poles
+How much the jets weaken toward the poles. Higher = a calm, flat polar cap with the motion confined to low latitudes; 0 = no EXTRA weakening, though a separate polar fade always applies near the pole
 
 <table><tr>
 <td align="center"><img src="img/sliders/jets__polar_decay__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.5</sub></td><td align="center"><img src="img/sliders/jets__polar_decay__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -574,7 +574,7 @@ How strongly jet amplitudes decay toward the poles
 
 `jets.strength` &mdash; range **0 to 3**, default **1**, tier `velocity`.
 
-Global zonal jet speed multiplier
+Overall speed of every east-west jet. Higher = more shear, so the bands stretch and smear faster; 0 = no east-west jets, though storms and churn still move the clouds (global zonal jet speed multiplier)
 
 <table><tr>
 <td align="center"><img src="img/sliders/jets__strength__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/jets__strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -587,7 +587,7 @@ Global zonal jet speed multiplier
 
 `turbulence.belt_boost` &mdash; range **1 to 4**, default **1.6**, tier `velocity`.
 
-Turbulence multiplier inside dark belts (cyclonic = spinning with the local planetary rotation; the storm-prone bands)
+Extra churn inside the dark belts only. Higher = the belts look rougher than the pale, calm zones; 1.0 = belts churn no differently from zones (turbulence multiplier for belts, which are cyclonic — spinning with the local planetary rotation — and are the storm-prone bands)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__belt_boost__lo.jpg" width="320"><br><sub>low &middot; 1</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.6</sub></td><td align="center"><img src="img/sliders/turbulence__belt_boost__hi.jpg" width="320"><br><sub>high &middot; 4</sub></td>
@@ -597,7 +597,7 @@ Turbulence multiplier inside dark belts (cyclonic = spinning with the local plan
 
 `turbulence.belt_replenish` &mdash; range **0 to 0.08**, default **0**, tier `restart`.
 
-Extra fine detail-noise replenished per step inside belts (emergent filaments)
+Extra fine detail-noise fed to the belts alone per step, on top of replenish_rate, so belt texture keeps regenerating instead of smearing flat. Higher = more of it, so the belts read busier; 0 = off (belt_replenish_scale sets how fine it is)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__belt_replenish__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.07</sub></td><td align="center"><img src="img/sliders/turbulence__belt_replenish__hi.jpg" width="320"><br><sub>high &middot; 0.08</sub></td>
@@ -607,7 +607,7 @@ Extra fine detail-noise replenished per step inside belts (emergent filaments)
 
 `turbulence.belt_replenish_scale` &mdash; range **1 to 4**, default **2**, tier `restart`.
 
-Belt replenishment frequency multiplier relative to the base detail frequency
+How fine that belt-only detail is next to the planet's base detail. Higher = finer filaments; 1.0 = the same size as everything else (belt replenishment frequency multiplier, relative to the base detail frequency; only bites when belt_replenish is above 0)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__belt_replenish_scale__lo.jpg" width="320"><br><sub>low &middot; 1</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 2</sub></td><td align="center"><img src="img/sliders/turbulence__belt_replenish_scale__hi.jpg" width="320"><br><sub>high &middot; 4</sub></td>
@@ -617,7 +617,7 @@ Belt replenishment frequency multiplier relative to the base detail frequency
 
 `turbulence.kh_wavenumber` &mdash; range **4 to 80**, default **24**, tier `velocity`.
 
-KH billow longitudinal wavenumber
+How many billows fit around the planet along a band edge. Higher = more, tighter scallops (longitudinal wavenumber of the Kelvin-Helmholtz train)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__kh_wavenumber__lo.jpg" width="320"><br><sub>low &middot; 4</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 24</sub></td><td align="center"><img src="img/sliders/turbulence__kh_wavenumber__hi.jpg" width="320"><br><sub>high &middot; 80</sub></td>
@@ -627,7 +627,7 @@ KH billow longitudinal wavenumber
 
 `turbulence.kh_amplitude` &mdash; range **0 to 2**, default **0.35**, tier `velocity`.
 
-Kelvin-Helmholtz wave amplitude along high-shear band boundaries
+How far a band edge billows where fast and slow jets meet. Higher = deeper scallops along the boundary; 0 = no billows, though the edge still meanders (see warp_amount) — Kelvin-Helmholtz wave amplitude along high-shear band boundaries
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__kh_amplitude__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.6</sub></td><td align="center"><img src="img/sliders/turbulence__kh_amplitude__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -637,7 +637,7 @@ Kelvin-Helmholtz wave amplitude along high-shear band boundaries
 
 `turbulence.evolution_rate` &mdash; range **0 to 0.1**, default **0.012**, tier `velocity`.
 
-How fast the turbulence pattern decorrelates per step
+How fast the churn pattern reshuffles as the sim runs. Higher = the pattern never settles; 0 = a pattern frozen in place, which the clouds then drift through (per-step rate at which the turbulence decorrelates)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__evolution_rate__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.012</sub></td><td align="center"><img src="img/sliders/turbulence__evolution_rate__hi.jpg" width="320"><br><sub>high &middot; 0.1</sub></td>
@@ -647,7 +647,7 @@ How fast the turbulence pattern decorrelates per step
 
 `turbulence.intensity` &mdash; range **0 to 3**, default **1**, tier `velocity`.
 
-Global turbulence (curl-noise) amplitude
+Overall amount of churn everywhere on the planet. Higher = every band looks busier; 0 = no churn of its own, though band-edge billows and storms still stir the clouds (global turbulence amplitude, from curl noise)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__intensity__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/turbulence__intensity__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -657,7 +657,7 @@ Global turbulence (curl-noise) amplitude
 
 `turbulence.replenish_rate` &mdash; range **0 to 0.5**, default **0.015**, tier `restart`.
 
-Fresh detail-noise blended into the detail tracer per step. High values (~0.3) keep quiescent zone bands detailed where the zonal jets would otherwise smear the detail away to ~half the belts'
+Fresh detail-noise fed to the whole planet every step, so texture does not wash out as the flow stretches it. High values (~0.3) keep the quiet pale zone bands as detailed as the belts, which the east-west jets would otherwise smear away to ~half (blended into the detail tracer)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__replenish_rate__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.35</sub></td><td align="center"><img src="img/sliders/turbulence__replenish_rate__hi.jpg" width="320"><br><sub>high &middot; 0.5</sub></td>
@@ -667,7 +667,7 @@ Fresh detail-noise blended into the detail tracer per step. High values (~0.3) k
 
 `turbulence.scale` &mdash; range **1 to 32**, default **6**, tier `velocity`, log scale.
 
-Base spatial frequency of the turbulence noise
+Size of the churn features. Higher = smaller, busier stirring; lower = broad, coarse swirls (base spatial frequency of the turbulence noise)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__scale__lo.jpg" width="320"><br><sub>low &middot; 1</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 6</sub></td><td align="center"><img src="img/sliders/turbulence__scale__hi.jpg" width="320"><br><sub>high &middot; 32</sub></td>
@@ -677,7 +677,7 @@ Base spatial frequency of the turbulence noise
 
 `turbulence.shear_coupling` &mdash; range **0 to 3**, default **1**, tier `velocity`.
 
-Extra turbulence where jet shear is strong
+Extra churn where neighboring jets meet. Higher = band edges churn while band interiors stay calm; 0 = turbulence that ignores jet shear entirely (belt_boost still applies, so coverage is not perfectly even)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__shear_coupling__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/turbulence__shear_coupling__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -687,7 +687,7 @@ Extra turbulence where jet shear is strong
 
 `turbulence.relax_tau` &mdash; range **50 to 2000**, default **350**, tier `restart`, log scale.
 
-Relaxation time (steps) pulling band color/height back toward the stamp
+How hard the bands are pulled back to their painted look after the flow smears them. Higher = a longer leash, so churn stays visible for longer (relaxation time in steps, pulling band color and height back toward the stamp)
 
 <table><tr>
 <td align="center"><img src="img/sliders/turbulence__relax_tau__lo.jpg" width="320"><br><sub>low &middot; 50</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 350</sub></td><td align="center"><img src="img/sliders/turbulence__relax_tau__hi.jpg" width="320"><br><sub>high &middot; 2000</sub></td>
@@ -720,7 +720,7 @@ Accent oval brightness (T0); negative = dark oval. Applied verbatim — accents 
 
 `storms.accent_count` &mdash; range **0 to 2**, default **0**, tier `restart`.
 
-Accent ovals: KIND_OVAL storms with EXPLICIT color (the Oval BA 'second red spot' unlock — a red oval beside the white population). Seeded on their own substream after the population cap, so the base storm field is untouched; count=2 places a pair at offset longitudes with identical appearance. 0 = off (byte-identical)
+Places accent ovals — KIND_OVAL storms with an EXPLICIT color, the Oval BA 'second red spot' unlock (a red oval beside the white population). Seeded on their own substream after the population cap, so the base storm field is untouched; count=2 places a pair at offset longitudes with identical appearance. 0 = off (byte-identical)
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><img src="img/sliders/storms__accent_count__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -766,7 +766,7 @@ Accent oval tint (T3): positive = warm/red end of the storm_tints gradient (Oval
 
 `storms.barge_density` &mdash; range **0 to 3**, default **1**, tier `restart`.
 
-Brown-barge cyclone population multiplier (belts)
+How many brown barges populate the belts. Higher = more of these dark elongated cyclones; 0 = none (brown-barge cyclone population multiplier)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__barge_density__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 2.989</sub></td><td align="center"><img src="img/sliders/storms__barge_density__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -776,7 +776,7 @@ Brown-barge cyclone population multiplier (belts)
 
 `storms.cast` &mdash; list editor, default **empty list**, tier `restart`.
 
-Cast list: storms placed by hand (kind + rendered position + size + optional color). Each entry is stamped verbatim after the seeded populations, exempt from the population cap and runtime mergers, so a director's storm survives the whole run where it was placed. Empty (the default) = no cast, byte-identical to the seeded-only field. Capped at 16 entries
+Cast list — storms placed by hand: kind, rendered position, size, and optional color. Each entry is stamped verbatim after the seeded populations, exempt from the population cap and runtime mergers, so a director's storm survives the whole run where it was placed. Empty (the default) = no cast, byte-identical to the seeded-only field. Capped at 16 entries
 
 _List of hand-placed sub-records edited in a dedicated GUI panel &mdash; documented as text; no rendered example._
 
@@ -834,7 +834,7 @@ Bright companion clouds pinned beside each hero storm (Neptune GDS companion / S
 
 `storms.hero_count` &mdash; range **0 to 3**, default **1**, tier `restart`.
 
-Giant anticyclones of Great Red Spot (GRS) class — the planet-dominating bright/red oval storms (co-rotates with the local ambient shear vorticity of the zone it sits in, which is what lets it persist against differential shear instead of getting torn apart)
+How many Great Red Spot (GRS) class storms to place. These are the giant, planet-dominating bright/red oval anticyclones; 0 = none (each co-rotates with the local ambient shear vorticity of the zone it sits in, which is what lets it persist against differential shear instead of getting torn apart)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__hero_count__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/storms__hero_count__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -890,7 +890,7 @@ Turbulent interior churn inside hero storms: a flow-scale fbm breaks up the smoo
 
 `storms.hero_radius` &mdash; range **0.03 to 0.25**, default **0.1**, tier `restart`.
 
-Hero vortex core radius, radians of arc (1 rad = 57.3 deg; default 0.10 rad is about 5.7 deg — GRS-scale)
+How big the hero storm's core is. Higher = a larger spot, and the hero jet bracket scales with it (hero vortex core radius, in radians of arc; 1 rad = 57.3 deg, and the default 0.10 rad is about 5.7 deg — GRS-scale)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__hero_radius__lo.jpg" width="320"><br><sub>low &middot; 0.03</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.15</sub></td><td align="center"><img src="img/sliders/storms__hero_radius__hi.jpg" width="320"><br><sub>high &middot; 0.25</sub></td>
@@ -930,7 +930,7 @@ Low-order deformation of the hero's outline away from a perfect ellipse: equator
 
 `storms.hero_shape_seed` &mdash; range **0 to 99999**, default **0**, tier `restart`.
 
-Re-rolls the hero's seeded shape lobes on their own substream of the master seed — changing it never perturbs any other seeded draw
+Re-rolls the hero's seeded shape lobes. Change it to try a different silhouette; it runs on its own substream of the master seed, so changing it never perturbs any other seeded draw
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><sub>high &middot; 99999<br>(not rendered)</sub></td>
@@ -950,7 +950,7 @@ Solid-body hero rotation (vorticity mode): blends the hero's vorticity from the 
 
 `storms.hero_strength` &mdash; range **0.2 to 3**, default **1**, tier `restart`.
 
-GRS-class hero storm vorticity amplitude
+How strongly the hero storm spins. Higher = a tighter, faster-whirling spot; the slider bottoms out at 0.2, so the hero always carries some circulation (GRS-class hero storm vorticity amplitude)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__hero_strength__lo.jpg" width="320"><br><sub>low &middot; 0.2</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/storms__hero_strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -960,7 +960,7 @@ GRS-class hero storm vorticity amplitude
 
 `storms.hero_taper` &mdash; range **0 to 1.5**, default **0**, tier `restart`.
 
-Upstream-end wedge taper: the reference GRS's boundary converges toward a point on the side the flow arrives from (measured 20-40% of local radius), while the wake end stays blunt. Deterministic (no seed), follows hero_wake_dir, deepest at ~35 deg off the upstream tip in the aspect-squashed frame (physically closer to the tip on an elongated hero — ~14 deg at aspect 2.9); the tip, the flanks and the whole downstream half are untouched. Inert wherever a hero's EFFECTIVE emergence is 0 (the global, or that storm's own override)
+Upstream-end wedge taper: the reference GRS's boundary converges toward a point on the side the flow arrives from (measured 20-40% of local radius), while the wake end stays blunt. Higher = a sharper wedge; 0 = off. Deterministic (no seed), follows hero_wake_dir, deepest at ~35 deg off the upstream tip in the aspect-squashed frame (physically closer to the tip on an elongated hero — ~14 deg at aspect 2.9); the tip, the flanks and the whole downstream half are untouched. Inert wherever a hero's EFFECTIVE emergence is 0 (the global, or that storm's own override)
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><sub>high &middot; 1.5<br>(not rendered)</sub></td>
@@ -1008,7 +1008,7 @@ _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
 `storms.merge_debris` &mdash; range **0 to 2**, default **1**, tier `restart`.
 
-Brightness of the transient turbulent collar a fresh merger leaves behind (inert while merge_rate is 0)
+How bright the transient turbulent collar is that a fresh merger leaves behind. Higher = a more visible scar; inert while merge_rate is 0
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__merge_debris__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/storms__merge_debris__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1028,7 +1028,7 @@ Anticyclone merger aggressiveness: converging same-sign ovals coalesce when thei
 
 `storms.outbreak_count` &mdash; range **0 to 3**, default **0**, tier `restart`.
 
-Convective outbreaks (Great-White-Spot events) during the development run
+How many convective outbreaks erupt during the development run. Higher = more; 0 = off (Great-White-Spot events)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__outbreak_count__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/storms__outbreak_count__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1072,7 +1072,7 @@ _Optional field: the GUI shows a **pin** checkbox &mdash; unpinned (None) keeps 
 
 `storms.outbreak_strength` &mdash; range **0.2 to 3**, default **1**, tier `restart`.
 
-Convective outbreak vorticity amplitude
+How violently each outbreak erupts. Higher = a bigger, brighter plume; the floor is 0.2, so an outbreak always carries some circulation (convective outbreak vorticity amplitude)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__outbreak_strength__lo.jpg" width="320"><br><sub>low &middot; 0.2</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/storms__outbreak_strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1082,7 +1082,7 @@ Convective outbreak vorticity amplitude
 
 `storms.oval_density` &mdash; range **0 to 4**, default **1**, tier `restart`.
 
-White-oval anticyclone population multiplier
+How many white ovals populate the zones. Higher = a more crowded field of these bright anticyclones; 0 = none (white-oval population multiplier)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__oval_density__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 3</sub></td><td align="center"><sub>high &middot; 4<br>(not rendered)</sub></td>
@@ -1102,7 +1102,7 @@ Solid-body rotation for LARGE white ovals (vorticity mode): the same anti-whirlp
 
 `storms.pearls_count` &mdash; range **0 to 14**, default **7**, tier `restart`.
 
-String-of-pearls ovals on one seeded latitude (0 = off)
+How many string-of-pearls ovals sit on one seeded latitude. Higher = a longer chain; 0 = off
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__pearls_count__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 14</sub></td>
@@ -1132,7 +1132,7 @@ Small-storm field: sub-oval white spots and dark spots scattered in loose latitu
 
 `storms.stamp_contrast` &mdash; range **0 to 3**, default **1**, tier `restart`.
 
-Tracer-stamp contrast of ovals/barges/pearls/small storms (1 = v1)
+How strongly the small storms stamp into the tracer. Higher = crisper ovals, barges and pearls against the band; 1 = the v1 look (tracer-stamp contrast)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__stamp_contrast__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 2</sub></td><td align="center"><img src="img/sliders/storms__stamp_contrast__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1150,7 +1150,7 @@ _Optional field: the GUI shows a **pin** checkbox &mdash; unpinned (None) keeps 
 
 `storms.wake_turbulence` &mdash; range **0 to 5**, default **1.8**, tier `restart`.
 
-Turbulence boost in the wake wedge downstream of hero storms
+Extra churn in the wake wedge downstream of the hero storm. Higher = a rougher, more disturbed trail; 0 = no boost at all (turbulence boost; the default 1.8 is already a strong one)
 
 <table><tr>
 <td align="center"><img src="img/sliders/storms__wake_turbulence__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.8</sub></td><td align="center"><img src="img/sliders/storms__wake_turbulence__hi.jpg" width="320"><br><sub>high &middot; 5</sub></td>
@@ -1163,7 +1163,7 @@ Turbulence boost in the wake wedge downstream of hero storms
 
 `waves.festoon_wavenumber` &mdash; range **4 to 24**, default **12**, tier `restart`.
 
-How many festoon plumes fit around the equator (higher = more, smaller plumes; the Rossby wavenumber of the train)
+How many festoon plumes fit around the equator. Higher = more, smaller plumes (the Rossby wavenumber of the train)
 
 <table><tr>
 <td align="center"><img src="img/sliders/waves__festoon_wavenumber__lo.jpg" width="320"><br><sub>low &middot; 4</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 12</sub></td><td align="center"><img src="img/sliders/waves__festoon_wavenumber__hi.jpg" width="320"><br><sub>high &middot; 24</sub></td>
@@ -1173,7 +1173,7 @@ How many festoon plumes fit around the equator (higher = more, smaller plumes; t
 
 `waves.festoon_hero_wavenumber` &mdash; range **4 to 24**, default **11**, tier `restart`.
 
-Wavenumber of the hero-adjacent festoon train (the default deliberately differs from festoon_wavenumber — twin wavenumbers read as a mechanical comb)
+How many plumes fit in the hero-adjacent festoon train. Keep it different from festoon_wavenumber — two trains at matching spacing read as a mechanical comb, which is why the default deliberately differs (the train's wavenumber)
 
 <table><tr>
 <td align="center"><sub>low &middot; 4<br>(not rendered)</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 11</sub></td><td align="center"><sub>high &middot; 24<br>(not rendered)</sub></td>
@@ -1193,7 +1193,7 @@ Second festoon train rooted on the band edge nearest the hero storm (plumes only
 
 `waves.festoon_strength` &mdash; range **0 to 3**, default **0.8**, tier `restart`.
 
-Festoon plumes + hot spots on the equatorial belt edge (0 = off)
+Scalloped plumes and dark hot spots along the equatorial belt edge. Higher = deeper, more pronounced festoons; 0 = off
 
 <table><tr>
 <td align="center"><img src="img/sliders/waves__festoon_strength__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 2.6</sub></td><td align="center"><img src="img/sliders/waves__festoon_strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1203,7 +1203,7 @@ Festoon plumes + hot spots on the equatorial belt edge (0 = off)
 
 `waves.hotspot_depth` &mdash; range **0 to 1**, default **0.6**, tier `restart`.
 
-Depth of the cloud-free hot spots at the wave troughs
+How dark the cloud-free hot spots read in the festoon wave troughs. Higher = deeper, higher-contrast gaps between the plumes; 0 = no gaps at all
 
 <table><tr>
 <td align="center"><img src="img/sliders/waves__hotspot_depth__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.7</sub></td><td align="center"><img src="img/sliders/waves__hotspot_depth__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -1213,7 +1213,7 @@ Depth of the cloud-free hot spots at the wave troughs
 
 `waves.ribbon_strength` &mdash; range **0 to 3**, default **0**, tier `restart`.
 
-Saturn-style ribbon wave on one mid-latitude jet (0 = off)
+Saturn-style ribbon wave running along one mid-latitude jet. Higher = a stronger meander in that jet's edge; 0 = off
 
 <table><tr>
 <td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0</sub></td><td align="center"><img src="img/sliders/waves__ribbon_strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1223,7 +1223,7 @@ Saturn-style ribbon wave on one mid-latitude jet (0 = off)
 
 `waves.ribbon_wavenumber` &mdash; range **4 to 30**, default **12**, tier `restart`.
 
-Wavenumber of the Saturn-style ribbon wave
+How many meanders the ribbon wave makes around the planet. Higher = tighter, more frequent meanders (wavenumber of the Saturn-style ribbon wave)
 
 <table><tr>
 <td align="center"><img src="img/sliders/waves__ribbon_wavenumber__lo.jpg" width="320"><br><sub>low &middot; 4</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 12</sub></td><td align="center"><img src="img/sliders/waves__ribbon_wavenumber__hi.jpg" width="320"><br><sub>high &middot; 30</sub></td>
@@ -1236,7 +1236,7 @@ Wavenumber of the Saturn-style ribbon wave
 
 `poles.north.cyclone_count` &mdash; range **3 to 9**, default **6**, tier `restart`.
 
-Ring cyclones around the central one (cyclone_cluster style)
+How many cyclones ring the central one. Higher = a denser rosette around the pole (cyclone_cluster style only)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__north__cyclone_count__lo.jpg" width="320"><br><sub>low &middot; 3</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 8</sub></td><td align="center"><img src="img/sliders/poles__north__cyclone_count__hi.jpg" width="320"><br><sub>high &middot; 9</sub></td>
@@ -1246,7 +1246,7 @@ Ring cyclones around the central one (cyclone_cluster style)
 
 `poles.south.cyclone_count` &mdash; range **3 to 9**, default **6**, tier `restart`.
 
-Ring cyclones around the central one (cyclone_cluster style)
+How many cyclones ring the central one. Higher = a denser rosette around the pole (cyclone_cluster style only)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__south__cyclone_count__lo.jpg" width="320"><br><sub>low &middot; 3</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 5</sub></td><td align="center"><img src="img/sliders/poles__south__cyclone_count__hi.jpg" width="320"><br><sub>high &middot; 9</sub></td>
@@ -1256,7 +1256,7 @@ Ring cyclones around the central one (cyclone_cluster style)
 
 `poles.north.field_density` &mdash; range **0 to 2**, default **0**, tier `restart`.
 
-Background small-cyclone field filling the cap poleward of 70 deg (PIA21641's dense cyclone hierarchy; 0 = off)
+Fills the cap poleward of 70 deg with a background of small cyclones. Higher = a busier, more crowded pole; 0 = off (the dense cyclone hierarchy of PIA21641)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__north__field_density__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.4</sub></td><td align="center"><img src="img/sliders/poles__north__field_density__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1266,7 +1266,7 @@ Background small-cyclone field filling the cap poleward of 70 deg (PIA21641's de
 
 `poles.south.field_density` &mdash; range **0 to 2**, default **0**, tier `restart`.
 
-Background small-cyclone field filling the cap poleward of 70 deg (PIA21641's dense cyclone hierarchy; 0 = off)
+Fills the cap poleward of 70 deg with a background of small cyclones. Higher = a busier, more crowded pole; 0 = off (the dense cyclone hierarchy of PIA21641)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__south__field_density__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.4</sub></td><td align="center"><img src="img/sliders/poles__south__field_density__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1276,7 +1276,7 @@ Background small-cyclone field filling the cap poleward of 70 deg (PIA21641's de
 
 `poles.north.polygon_sides` &mdash; range **3 to 9**, default **6**, tier `restart`.
 
-Polygon wavenumber of the polar jet (polygon_jet style)
+How many sides the polar jet's polygon has. 6 = Saturn's hexagon (polygon wavenumber; polygon_jet style only)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__north__polygon_sides__lo.jpg" width="320"><br><sub>low &middot; 3</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 6</sub></td><td align="center"><img src="img/sliders/poles__north__polygon_sides__hi.jpg" width="320"><br><sub>high &middot; 9</sub></td>
@@ -1286,7 +1286,7 @@ Polygon wavenumber of the polar jet (polygon_jet style)
 
 `poles.south.polygon_sides` &mdash; range **3 to 9**, default **6**, tier `restart`.
 
-Polygon wavenumber of the polar jet (polygon_jet style)
+How many sides the polar jet's polygon has. 6 = Saturn's hexagon (polygon wavenumber; polygon_jet style only)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__south__polygon_sides__lo.jpg" width="320"><br><sub>low &middot; 3</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 6</sub></td><td align="center"><img src="img/sliders/poles__south__polygon_sides__hi.jpg" width="320"><br><sub>high &middot; 9</sub></td>
@@ -1296,7 +1296,7 @@ Polygon wavenumber of the polar jet (polygon_jet style)
 
 `poles.north.strength` &mdash; range **0 to 3**, default **1**, tier `restart`.
 
-Polar feature vorticity amplitude (central cyclone / polygon jet)
+How strongly the polar feature swirls. Higher = a tighter, better-defined cap; 0 = flat (vorticity amplitude of the central cyclone / polygon jet)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__north__strength__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.35</sub></td><td align="center"><img src="img/sliders/poles__north__strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1306,7 +1306,7 @@ Polar feature vorticity amplitude (central cyclone / polygon jet)
 
 `poles.south.strength` &mdash; range **0 to 3**, default **1**, tier `restart`.
 
-Polar feature vorticity amplitude (central cyclone / polygon jet)
+How strongly the polar feature swirls. Higher = a tighter, better-defined cap; 0 = flat (vorticity amplitude of the central cyclone / polygon jet)
 
 <table><tr>
 <td align="center"><img src="img/sliders/poles__south__strength__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.35</sub></td><td align="center"><img src="img/sliders/poles__south__strength__hi.jpg" width="320"><br><sub>high &middot; 3</sub></td>
@@ -1316,7 +1316,7 @@ Polar feature vorticity amplitude (central cyclone / polygon jet)
 
 `poles.north.style` &mdash; dropdown, one of `cyclone_cluster` / `polygon_jet` / `plain_vortex` / `calm`, default **`cyclone_cluster`**, tier `restart`.
 
-Polar feature style
+Which polar feature sits over this pole. cyclone_cluster = a central cyclone ringed by others (Jupiter); polygon_jet = a hexagonal jet (Saturn); plain_vortex = one tight swirl; calm = nothing at all
 
 _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
@@ -1324,7 +1324,7 @@ _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
 `poles.south.style` &mdash; dropdown, one of `cyclone_cluster` / `polygon_jet` / `plain_vortex` / `calm`, default **`plain_vortex`**, tier `restart`.
 
-Polar feature style
+Which polar feature sits over this pole. cyclone_cluster = a central cyclone ringed by others (Jupiter); polygon_jet = a hexagonal jet (Saturn); plain_vortex = one tight swirl; calm = nothing at all
 
 _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
@@ -1355,7 +1355,7 @@ Chromophore aging: ties color saturation to the dynamical freshness tracer (T2).
 
 `appearance.chroma_scale` &mdash; range **0 to 2**, default **1**, tier `post`.
 
-Oklab chroma multiplier on the final color (1 = off) — perceptual saturation, recommended over 'saturation' (an sRGB luma mix). No rand: adding a draw would reshuffle every later randomize draw
+How saturated the final color reads. Higher = richer color, lower = toward gray; 1 = off. Recommended over 'saturation', which is an sRGB luma mix (Oklab chroma multiplier — perceptual saturation). No rand: adding a draw would reshuffle every later randomize draw
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__chroma_scale__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/appearance__chroma_scale__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1365,7 +1365,7 @@ Oklab chroma multiplier on the final color (1 = off) — perceptual saturation, 
 
 `appearance.chroma_variance` &mdash; range **0 to 0.5**, default **0**, tier `post`.
 
-Longitudinal within-band chroma drift: bands hold pockets of more/less saturated material varying slowly with longitude (the reference's saturated-pocket texture)
+Slow saturation drift along each band, so it holds pockets of richer and duller material. Higher = more obvious pockets; 0 = off (longitudinal within-band chroma drift, varying slowly with longitude — the reference's saturated-pocket texture)
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__chroma_variance__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.35</sub></td><td align="center"><img src="img/sliders/appearance__chroma_variance__hi.jpg" width="320"><br><sub>high &middot; 0.5</sub></td>
@@ -1375,7 +1375,7 @@ Longitudinal within-band chroma drift: bands hold pockets of more/less saturated
 
 `appearance.contrast` &mdash; range **0.2 to 2**, default **1**, tier `post`.
 
-Color contrast multiplier about mid-gray
+Overall image contrast. Higher = punchier darks and brights; 1.0 = off (color contrast multiplier about mid-gray)
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__contrast__lo.jpg" width="320"><br><sub>low &middot; 0.2</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.8</sub></td><td align="center"><img src="img/sliders/appearance__contrast__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1395,7 +1395,7 @@ Two-material tint for synthesized detail: bright detail excursions shade toward 
 
 `appearance.gamma` &mdash; range **0.4 to 2.5**, default **1**, tier `post`.
 
-Final tone-curve gamma on the color map
+Final brightness curve on the color map. Higher = brighter midtones, lower = darker; 1.0 = off (tone-curve gamma, applied as pow(color, 1/gamma))
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__gamma__lo.jpg" width="320"><br><sub>low &middot; 0.4</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/appearance__gamma__hi.jpg" width="320"><br><sub>high &middot; 2.5</sub></td>
@@ -1405,7 +1405,7 @@ Final tone-curve gamma on the color map
 
 `appearance.haze_amount` &mdash; range **0 to 1**, default **0**, tier `post`.
 
-Global haze: the Jupiter (0) to Saturn (~0.6) axis
+Milky overhead haze washing the whole planet. Higher = softer and creamier, the Saturn end (~0.6); 0 = off, the crisp Jupiter look (the global haze axis)
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__haze_amount__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.05</sub></td><td align="center"><img src="img/sliders/appearance__haze_amount__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -1415,7 +1415,7 @@ Global haze: the Jupiter (0) to Saturn (~0.6) axis
 
 `appearance.hue_variance` &mdash; range **0 to 0.35**, default **0**, tier `post`.
 
-Iso-luminance Oklab hue drift (radians of max rotation; 1 rad = 57.3 deg): differently-hued material at the same lightness, which a luminance-keyed palette gradient cannot express -- the hue-diversity lever the realism metrics name
+Lets neighboring material differ in hue at the same brightness. Higher = a more varied, less monotone planet; 0 = off (iso-luminance Oklab hue drift, in radians of max rotation; 1 rad = 57.3 deg). Differently-hued material at the same lightness, which a luminance-keyed palette gradient cannot express -- the hue-diversity lever the realism metrics name
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__hue_variance__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.3</sub></td><td align="center"><img src="img/sliders/appearance__hue_variance__hi.jpg" width="320"><br><sub>high &middot; 0.35</sub></td>
@@ -1435,7 +1435,7 @@ Deepens the polar cap canvas toward a dark blue-teal floor so the folded-filamen
 
 `appearance.polar_tint_start_lat` &mdash; range **30 to 80**, default **55**, tier `post`.
 
-Latitude (deg) where the polar tint begins
+Latitude where the polar tint starts to come in, in degrees. Higher = a smaller, tighter cap
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__polar_tint_start_lat__lo.jpg" width="320"><br><sub>low &middot; 30</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 56</sub></td><td align="center"><img src="img/sliders/appearance__polar_tint_start_lat__hi.jpg" width="320"><br><sub>high &middot; 80</sub></td>
@@ -1445,7 +1445,7 @@ Latitude (deg) where the polar tint begins
 
 `appearance.polar_tint_strength` &mdash; range **0 to 1**, default **0**, tier `post`.
 
-Polar tint blend strength (0 = off, the pre-v1.1 look)
+How strongly the polar cap tint is blended in. Higher = a bluer, more distinct cap; 0 = off, the pre-v1.1 look
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__polar_tint_strength__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.68</sub></td><td align="center"><img src="img/sliders/appearance__polar_tint_strength__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -1455,7 +1455,7 @@ Polar tint blend strength (0 = off, the pre-v1.1 look)
 
 `appearance.saturation` &mdash; range **0 to 2**, default **1**, tier `post`.
 
-sRGB saturation multiplier (luma-preserving mix toward gray); prefer chroma_scale for perceptual (Oklab) saturation
+Color intensity of the final image. Higher = more vivid, lower = toward gray; 1.0 = off. Prefer chroma_scale, which is perceptual (sRGB saturation multiplier, a luma-preserving mix toward gray; chroma_scale is the Oklab equivalent)
 
 <table><tr>
 <td align="center"><img src="img/sliders/appearance__saturation__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/appearance__saturation__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1468,7 +1468,7 @@ sRGB saturation multiplier (luma-preserving mix toward gray); prefer chroma_scal
 
 `detail.belt_texture` &mdash; range **0 to 2.5**, default **0**, tier `post`.
 
-Storm-scale folded luminance structure inside belts (0.5-3 deg, flow-backtraced so patches fold with the flow) + a belt floor for the fine filaments; the v1.4 audit's dominant texture gap on broad-band layouts
+Storm-scale folded structure inside the belts, at 0.5-3 deg across. Higher = a busier, more mottled belt interior; 0 = off (folded luminance structure, flow-backtraced so patches fold with the flow, plus a belt floor for the fine filaments — the v1.4 audit's dominant texture gap on broad-band layouts)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__belt_texture__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.2</sub></td><td align="center"><img src="img/sliders/detail__belt_texture__hi.jpg" width="320"><br><sub>high &middot; 2.5</sub></td>
@@ -1478,7 +1478,7 @@ Storm-scale folded luminance structure inside belts (0.5-3 deg, flow-backtraced 
 
 `detail.belt_texture_fine` &mdash; range **0 to 2.5**, default **0**, tier `post`.
 
-Finer sub-grid belt fold octave: a second flow-aligned backtrace hop folds mid-frequency noise below the sim grid scale, densifying belt texture at matched scale
+A finer second octave of that belt fold, below the sim grid scale. Higher = denser belt texture at matched scale; 0 = off (a finer sub-grid octave: a second flow-aligned backtrace hop, folding mid-frequency noise)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__belt_texture_fine__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.4</sub></td><td align="center"><img src="img/sliders/detail__belt_texture_fine__hi.jpg" width="320"><br><sub>high &middot; 2.5</sub></td>
@@ -1488,7 +1488,7 @@ Finer sub-grid belt fold octave: a second flow-aligned backtrace hop folds mid-f
 
 `detail.cellular_amount` &mdash; range **0 to 2**, default **0.6**, tier `post`.
 
-Convective cell (closed-cell/popcorn) texture in quiet zones
+Popcorn-like convective cell texture in the quiet zones. Higher = a more granular, cauliflower zone; 0 = off (closed-cell texture)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__cellular_amount__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.9</sub></td><td align="center"><img src="img/sliders/detail__cellular_amount__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1518,7 +1518,7 @@ Render-time combed-fiber synthesis over the ELONGATED bright-cloud stamps (compa
 
 `detail.flow_phases` &mdash; range **1 to 4**, default **3**, tier `post`.
 
-Staggered advected-noise phases (more = richer filaments)
+How many staggered noise phases the detail is built from. More = richer, more layered filaments (staggered advected-noise phases)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__flow_phases__lo.jpg" width="320"><br><sub>low &middot; 1</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 4</sub></td>
@@ -1528,7 +1528,7 @@ Staggered advected-noise phases (more = richer filaments)
 
 `detail.flow_stretch` &mdash; range **0.1 to 4**, default **1**, tier `post`.
 
-How far detail noise is advected along the flow
+How far the detail noise is smeared along the flow. Higher = longer, more drawn-out streaks (advection distance for the detail noise)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__flow_stretch__lo.jpg" width="320"><br><sub>low &middot; 0.1</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.3</sub></td><td align="center"><img src="img/sliders/detail__flow_stretch__hi.jpg" width="320"><br><sub>high &middot; 4</sub></td>
@@ -1538,7 +1538,7 @@ How far detail noise is advected along the flow
 
 `detail.frequency` &mdash; range **8 to 256**, default **48**, tier `post`, log scale.
 
-Base spatial frequency of the detail noise
+Size of the synthesized detail. Higher = finer grain; lower = coarser, broader texture (base spatial frequency of the detail noise)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__frequency__lo.jpg" width="320"><br><sub>low &middot; 8</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 64</sub></td><td align="center"><img src="img/sliders/detail__frequency__hi.jpg" width="320"><br><sub>high &middot; 256</sub></td>
@@ -1568,7 +1568,7 @@ Tightly-pitched wound-lane filaments wrapping the hero collar (the GRS 'hollow' 
 
 `detail.hero_spiral` &mdash; range **0 to 1.5**, default **0**, tier `post`.
 
-Tightly wound internal spiral lanes inside hero storms (the Juno-close-up GRS look) plus collar streamlines; winds in the hero's actual rotation sense. Stationary in the hero frame — fine for stills
+Tightly wound spiral lanes inside the hero storm, plus collar streamlines. Higher = a more strongly drawn spiral; 0 = off (the Juno-close-up GRS look; winds in the hero's actual rotation sense). Stationary in the hero frame — fine for stills
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__hero_spiral__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.55</sub></td><td align="center"><img src="img/sliders/detail__hero_spiral__hi.jpg" width="320"><br><sub>high &middot; 1.5</sub></td>
@@ -1588,7 +1588,7 @@ Inks the hero storm's turbulent wake as the reference GRS's chain of rolled bill
 
 `detail.intensity` &mdash; range **0 to 2**, default **0.55**, tier `post`.
 
-Export/preview detail synthesis amplitude
+How much synthesized detail is laid over the planet. Higher = more texture everywhere; 0 = off, and the detail-FX levers below go inert with it (export/preview detail synthesis amplitude)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__intensity__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.95</sub></td><td align="center"><img src="img/sliders/detail__intensity__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1598,7 +1598,7 @@ Export/preview detail synthesis amplitude
 
 `detail.intermittency` &mdash; range **0 to 1**, default **0**, tier `post`.
 
-Longitudinal patchiness of the filament/striation texture: violent folded patches abutting calm laminar runs (the real mosaic's chaos is intermittent, not uniform). No rand: a draw here would reshuffle every later randomize draw
+Breaks the filament and striation texture into patches along each band, so violent folded stretches abut calm laminar runs. Higher = a more broken-up mosaic; 0 = off, the texture stays uniform (longitudinal patchiness — the real mosaic's chaos is intermittent, not uniform). No rand: a draw here would reshuffle every later randomize draw
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__intermittency__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.65</sub></td><td align="center"><img src="img/sliders/detail__intermittency__hi.jpg" width="320"><br><sub>high &middot; 1</sub></td>
@@ -1608,7 +1608,7 @@ Longitudinal patchiness of the filament/striation texture: violent folded patche
 
 `detail.mottle` &mdash; range **0 to 1.5**, default **0**, tier `post`.
 
-Temperate lace mottle (35-60 deg): granular bright rings, dark dots, and lacy folds where banding gives way -- the reference's mid-latitude storm-flecked character
+Temperate lace mottle at 35-60 deg: granular bright rings, dark dots, and lacy folds where the banding gives way. Higher = a more flecked mid-latitude; 0 = off (the reference's mid-latitude storm-flecked character)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__mottle__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1.1</sub></td><td align="center"><img src="img/sliders/detail__mottle__hi.jpg" width="320"><br><sub>high &middot; 1.5</sub></td>
@@ -1628,7 +1628,7 @@ Polar folded-filamentary region (the Juno cap look): dense, multi-scale, flow-fo
 
 `detail.polar_stipple` &mdash; range **0 to 2**, default **0**, tier `post`.
 
-Bright granular storm speckle (popcorn) poleward of ~55 deg (the band-to-mottle transition character)
+Bright granular storm speckle poleward of ~55 deg. Higher = a more heavily flecked cap; 0 = off (popcorn — the band-to-mottle transition character)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__polar_stipple__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 0.8</sub></td><td align="center"><img src="img/sliders/detail__polar_stipple__hi.jpg" width="320"><br><sub>high &middot; 2</sub></td>
@@ -1658,7 +1658,7 @@ Suppress the WHOLE filament-streak accumulator (the ungated base flow-streak + i
 
 `detail.striation_amount` &mdash; range **0 to 1.5**, default **0**, tier `post`.
 
-Ropey flow-parallel striations inside belts (intra-band thread texture; 0 = the pre-v1.1 look)
+Ropey threads running along the flow inside the belts. Higher = a more strongly combed belt; 0 = the pre-v1.1 look (intra-band flow-parallel striation thread texture)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__striation_amount__lo.jpg" width="320"><br><sub>low &middot; 0</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><img src="img/sliders/detail__striation_amount__hi.jpg" width="320"><br><sub>high &middot; 1.5</sub></td>
@@ -1668,7 +1668,7 @@ Ropey flow-parallel striations inside belts (intra-band thread texture; 0 = the 
 
 `detail.striation_frequency` &mdash; range **16 to 512**, default **96**, tier `post`, log scale.
 
-Base spatial frequency of the striation noise
+How fine the striation threads are. Higher = tighter, thinner ropes (base spatial frequency of the striation noise)
 
 <table><tr>
 <td align="center"><img src="img/sliders/detail__striation_frequency__lo.jpg" width="320"><br><sub>low &middot; 16</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 160</sub></td><td align="center"><img src="img/sliders/detail__striation_frequency__hi.jpg" width="320"><br><sub>high &middot; 512</sub></td>
@@ -1721,7 +1721,7 @@ Modulate the night-side emission map (thermal/lightning glow + aurora) by the ma
 
 `mask.file` &mdash; file path, default **None**, tier `post`.
 
-Path to a grayscale equirect (2:1) PNG mask that paints WHERE the three Mask targets act (white = full effect, black = none). Use forward slashes. None = no mask (all Mask targets inert). The path is resolved relative to a loaded preset's folder and re-saved next to a preset you save, so a preset stays portable; a missing file at load warns and disables the mask (never crashes)
+Path to a grayscale PNG that paints WHERE the three Mask targets act — white = full effect, black = none. Use a 2:1 equirect image (width exactly twice the height): any other aspect is refused with a warning and the mask stays off. Use forward slashes. None = no mask (all Mask targets inert). The path is resolved relative to a loaded preset's folder and re-saved next to a preset you save, so a preset stays portable; a missing file at load warns and disables the mask (never crashes)
 
 _File-path field: the GUI shows a text entry + **Browse...** button (empty = None). Documented as text; no rendered example._
 
@@ -1756,7 +1756,7 @@ _Shown on the **emission map** (night-side glow) with all three glows enabled; t
 
 `emission.aurora_strength` &mdash; range **0 to 2**, default **0**, tier `post`.
 
-Auroral ovals around the (offset) magnetic poles; written to emission.exr's ALPHA channel so the importer can lift it onto a shell. Preview via the viewport's Emission channel (composited as alpha x aurora_color); not visible in the Color preview
+Auroral ovals ringing the (offset) magnetic poles. Higher = a brighter oval; 0 = off. Written to emission.exr's ALPHA channel so the importer can lift it onto a shell. Preview via the viewport's Emission channel (composited as alpha x aurora_color); not visible in the Color preview
 
 _Shown on the **emission map** (night-side glow) with all three glows enabled; tonemapped for display. The color map is unchanged by emission sliders._
 
@@ -1792,7 +1792,7 @@ _Shown on the **emission map** (night-side glow) with all three glows enabled; t
 
 `emission.lightning_strength` &mdash; range **0 to 2**, default **0**, tier `post`.
 
-Frozen lightning-flash clusters in cyclonic belts and at high latitudes (the Juno look: light pools under the deck plus sparse HDR cores). Preview: Emission channel, not Color
+Frozen lightning-flash clusters in the cyclonic belts and at high latitudes. Higher = brighter, more visible flashes; 0 = off (the Juno look: light pools under the deck plus sparse HDR cores). Preview: Emission channel, not Color
 
 _Shown on the **emission map** (night-side glow) with all three glows enabled; tonemapped for display. The color map is unchanged by emission sliders._
 
@@ -1816,7 +1816,7 @@ _Shown on the **emission map** (night-side glow) with all three glows enabled; t
 
 `emission.thermal_strength` &mdash; range **0 to 2**, default **0**, tier `post`.
 
-5-micron thermal glow through cloud gaps (gated on the cloud-top DEPRESSION vs the band stamp: hot-spot chains blaze, barges glow, belts glimmer, zones stay dark). Preview: Emission channel, not Color
+5-micron thermal glow shining up through gaps in the cloud deck. Higher = a hotter interior showing through; 0 = off (gated on the cloud-top DEPRESSION vs the band stamp: hot-spot chains blaze, barges glow, belts glimmer, zones stay dark). Preview: Emission channel, not Color
 
 _Shown on the **emission map** (night-side glow) with all three glows enabled; tonemapped for display. The color map is unchanged by emission sliders._
 
@@ -1843,7 +1843,7 @@ _Shown on the **emission map** (night-side glow) with all three glows enabled; t
 
 `physical.height_midlevel` &mdash; range **0 to 1**, default **0.5**, tier `post`.
 
-Height-map value mapped to the mid cloud deck (Blender importer reference level)
+Which height-map value counts as the mid cloud deck: above it reads as raised cloud, below as a gap. Only used when the Blender import turns Displacement on — the default bump path ignores it (the importer's reference level)
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -1851,7 +1851,7 @@ _Passed to the Blender importer / controls the output file, not the texture appe
 
 `physical.height_scale` &mdash; range **0 to 0.05**, default **0.004**, tier `post`.
 
-Cloud-deck relief as a fraction of planet radius (full height-map range)
+How far the cloud deck stands out in relief. Higher = deeper displacement in Blender (a fraction of planet radius, across the full height-map range)
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -1859,7 +1859,7 @@ _Passed to the Blender importer / controls the output file, not the texture appe
 
 `physical.radius_km` &mdash; range **1000 to 200000**, default **69911**, tier `post`.
 
-Planet equatorial radius in kilometers, passed through to the Blender importer for scale
+Planet equatorial radius in kilometers. A scale hint only: it changes nothing in the texture, and is passed through to the Blender importer
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -1898,7 +1898,7 @@ _Boolean toggle (GUI checkbox) &mdash; documented as text; no rendered example._
 
 `export.png_compression` &mdash; range **0 to 9**, default **2**, tier `post`.
 
-PNG deflate level (low = much faster at 16K)
+How hard the color PNG is squeezed on export. Lower = much faster writes, which matters at 16K; higher = a smaller file. Only the color map uses it; the 16-bit height PNGs are always written at the default level (zlib deflate level)
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -1914,7 +1914,7 @@ _Choice field (GUI dropdown) &mdash; documented as text; no rendered example._
 
 `export.width` &mdash; range **512 to 16384**, default **2048**, tier `post`.
 
-Equirect map width in pixels; height is width/2
+Map width in pixels. On the default equirect projection the height is half the width, the standard 2:1 ratio; on the cube projection each of the six faces is width/4 square instead
 
 _Passed to the Blender importer / controls the output file, not the texture appearance &mdash; no visual example._
 
@@ -1925,7 +1925,7 @@ _Passed to the Blender importer / controls the output file, not the texture appe
 
 `rings.brightness` &mdash; range **0 to 2**, default **1**, tier `post`.
 
-Multiplier on the ice reflectance (ring RGB brightness)
+How bright the rings read. Higher = whiter, more reflective ice; 1.0 = the physically-derived value (multiplier on the ice reflectance, ring RGB)
 
 <table><tr>
 <td align="center"><sub>low &middot; 0<br>(not rendered)</sub></td><td align="center"><img src="img/sliders/_baseline_kinematic.jpg" width="320"><br><sub>preset &middot; 1</sub></td><td align="center"><sub>high &middot; 2<br>(not rendered)</sub></td>

@@ -40,8 +40,11 @@ JOVIAN skeleton, so a band-template change touches four presets at once; cobalt_
 band CENTRED on the equator needs `count ≡ 1 (mod 4)`), green_giant (an enriched
 sulfur-chromophore giant — olive/chartreuse, `sim.resolution` 4096 and pinned in
 `SIM_RES_OVERRIDES`; the ONLY preset using `vort_inject_mask = belts`, and note a mask is
-a MULTIPLIER on `vort_inject`: belt_mask covers ~48% of latitudes against shear_norm's
-~4%, so belts SPREADS churn relative to shear and the amplitude must be retuned down with
+a MULTIPLIER on `vort_inject`: belt_mask is near-binary with mean ~0.48 on green_giant
+(~0.56 on the shared Jovian skeleton), while shear_norm is a GRADED [0,1] field with mean
+~0.10 — so belts admits several times the total churn shear does (the older "~48% vs ~4%"
+pairing compared a mask mean against `frac(shear_norm > 0.5)` and overstated it ~3x), and
+so belts SPREADS churn relative to shear and the amplitude must be retuned down with
 it. Seeded band path, and on that path `count` must be EVEN — at an odd count with belts
 in the majority the median IS the top belt value, so `values < median` silently
 misclassifies one belt as a zone; the model's alternation validator only runs on the
@@ -175,7 +178,11 @@ forbidden everywhere below `app`. `gl` is the ONLY moderngl touchpoint.
 ## Lever-author checklist (adding a new opt-in visual lever)
 
 1. `pfield()` in the params model (tier + rand + ui metadata; default = no-op; add
-   `label=` if the field name is engine vocabulary).
+   `label=` if the field name is engine vocabulary). The `description` is the artist's
+   tooltip AND the search haystack — write it to the rubric in `params/model.py`'s module
+   docstring (visual read first, physics last in one parenthetical, say what 0 does).
+   `tests/unit/test_description_rubric.py` measures it and will fail a new field that
+   misses; `test_description_findability.py` pins terms no rewrite may drop.
 2. Shader uniform + preprocessor block (variant define, not a runtime branch).
 3. Variant-selection predicate: for detail-FX levers, tag the pfield `fx=True` — the
    DETAIL_FX predicate, the build-time uniform tripwire, AND the cross-ref test all derive

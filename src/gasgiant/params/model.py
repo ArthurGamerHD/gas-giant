@@ -14,9 +14,35 @@ Every tunable field carries metadata in ``json_schema_extra``:
   True = hidden unless Advanced is toggled on (or an active search matches
   it) -- power-user/fine-tuning knobs, opt-in byte-identical-off-by-default
   levers, and preset-only fields.
+- ``label``: the artist-facing widget caption. Omit it and the caption is the
+  derived ``name.replace("_", " ")``, which is right for a field whose name is
+  already plain English and wrong for one named in engine vocabulary --
+  ``vort psi drag`` is not a caption. Set it for those; the field NAME never
+  changes. Resolve captions through ``field_label``, never by re-deriving.
 
 Metadata is plain JSON data only — no callables, no GUI imports — so the core
 stays GUI-agnostic in fact, not just in name.
+
+``description`` is the artist-facing tooltip AND the search haystack, which is
+what makes it a contract rather than a comment: search bypasses the
+Basic/Advanced gate, so a word deleted from a description is a field that can
+no longer be surfaced. Write it to the rubric below -- REORDER, never delete.
+
+1.  Lead with the visual read, in one sentence: what the artist SEES change.
+    That first sentence ends at the first ``.``/``;``/``:`` outside parentheses,
+    is 15-200 characters, opens with a capital, and carries no solver jargon.
+2.  Then the direction of travel, for continuous levers ("higher = tighter").
+3.  Say what 0 does for anything that defaults to 0 ("0 = off"), and qualify
+    anything mode-specific or conditional ("vorticity mode only") VERBATIM --
+    a dropped activation clause is a lever that silently does nothing.
+4.  Physics last, in ONE trailing parenthetical. Angles get their gloss
+    (``1 rad = 57.3 deg``); cross-references to other fields stay literal so
+    search finds them.
+5.  Keep the whole thing under ~600 characters.
+
+``tests/unit/test_description_rubric.py`` measures every one of these against
+the whole corpus and pins the outstanding debt, so the rubric is enforced
+rather than merely documented.
 """
 
 from __future__ import annotations
@@ -244,50 +270,77 @@ class BandTemplate(_Params):
 class BandsParams(_Params):
     count: int = pfield(
         14, tier=Tier.RESTART, lo=2, hi=MAX_BANDS, rand=(6, 24), ui="Bands",
-        description="Number of zones+belts pole to pole",
+        description="How many bands circle the planet from pole to pole, "
+                    "counting zones and belts together. Higher = narrower "
+                    "bands",
     )
     width_jitter: float = pfield(
         0.35, tier=Tier.RESTART, lo=0.0, hi=1.0, rand=(0.1, 0.6), ui="Bands",
-        description="Randomness of band width distribution",
+        description="How much the band widths vary from one another. Higher = "
+                    "a less regular, more natural mix of wide and narrow "
+                    "bands; 0 = every band the same size — equal-area, so "
+                    "the polar ones still read taller on a flat map "
+                    "(randomness of the band width distribution)",
     )
     edge_softness: float = pfield(
         0.012, tier=Tier.RESTART, lo=0.001, hi=0.1, rand=(0.005, 0.03), log=True,
         adv=True, ui="Bands",
-        description="Half-width of band-edge transitions, radians of latitude"
-                    " (1 rad = 57.3 deg; default 0.012 rad is about 0.7 deg)",
+        description="How sharply one band gives way to the next. Higher = "
+                    "softer, more diffuse edges; low = a hard line (half-width "
+                    "of the band-edge transition, in radians of latitude; "
+                    "1 rad = 57.3 deg, and the default 0.012 rad is about "
+                    "0.7 deg)",
     )
     value_contrast: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=2.0, rand=(0.6, 1.3), ui="Bands",
-        description="Zone/belt brightness separation multiplier",
+        description="How far apart the pale zones and dark belts sit in "
+                    "brightness. Higher = a bolder, higher-contrast planet; "
+                    "1.0 = the palette's own separation (zone/belt brightness "
+                    "multiplier; inert on the band-template path)",
     )
     warp_amount: float = pfield(
         0.035, tier=Tier.RESTART, lo=0.0, hi=0.3, rand=(0.01, 0.09), ui="Bands",
-        description="Band-boundary meander amplitude, radians of latitude"
-                    " (1 rad = 57.3 deg; default 0.035 rad is about 2 deg)",
+        description="How far the band boundaries wander north and south. "
+                    "Higher = wavier, less ruler-straight bands; 0 = "
+                    "perfectly straight (band-boundary meander amplitude, in "
+                    "radians of latitude; 1 rad = 57.3 deg, and the default "
+                    "0.035 rad is about 2 deg)",
     )
     warp_freq: float = pfield(
         3.0, tier=Tier.RESTART, lo=0.5, hi=16.0, rand=(1.5, 6.0), log=True, adv=True, ui="Bands",
         label="Band meander scale",
-        description="Band-boundary meander spatial frequency",
+        description="How often the band boundaries wander as they wrap the "
+                    "planet. Higher = tighter, more frequent meanders "
+                    "(band-boundary meander spatial frequency)",
     )
     detail_amount: float = pfield(
         0.10, tier=Tier.RESTART, lo=0.0, hi=0.5, rand=(0.04, 0.2), ui="Bands",
-        description="Small-scale color-index noise amplitude",
+        description="How much fine color mottling breaks up each band. "
+                    "Higher = a grainier, less flat band; 0 = flat color "
+                    "(small-scale color-index noise amplitude)",
     )
     hue_jitter: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=0.15, rand=(0.0, 0.08), adv=True, ui="Bands",
-        description="Per-band color-index offset along the palette (NEB-orange vs "
-                    "SEB-brown variation); seeded independently of the band layout",
+        description="Nudges each band's color along the palette, so neighbors "
+                    "do not share one hue. Higher = more variety band to "
+                    "band; 0 = off (per-band color-index offset — NEB-orange "
+                    "vs SEB-brown variation; seeded independently of the band "
+                    "layout)",
     )
     variance_amount: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=0.3, rand=(0.02, 0.12), adv=True, ui="Bands",
-        description="Within-band longitudinal color drift (real belts hold several "
-                    "hues at once, varying slowly with longitude)",
+        description="Slow color drift along the length of each band. Higher = "
+                    "a band that lightens and darkens as it wraps the planet; "
+                    "0 = off. For a hue-only drift at constant brightness use "
+                    "hue_variance (within-band longitudinal drift along the "
+                    "palette, varying slowly with longitude)",
     )
     faded_sector: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=1.0, rand=(0.0, 0.7), adv=True, ui="Bands",
-        description="SEB-fade: one belt gets a pale desaturated sector spanning "
-                    "~100 degrees of longitude",
+        description="One belt gets a pale, desaturated sector spanning ~100 "
+                    "degrees of longitude. Higher = a more washed-out sector; "
+                    "0 = off. Target band = faded_band_index, or the widest "
+                    "low/mid belt when that is unset (the SEB-fade epoch)",
     )
     belt_fade: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=1.0, adv=True, ui="Bands",
@@ -315,28 +368,42 @@ class BandsParams(_Params):
     )
     contrast_envelope: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=1.0, rand=(0.3, 0.8), adv=True, ui="Bands",
-        description="Banding contrast collapse poleward of ~45 deg toward mottle "
-                    "(the real latitude-contrast profile)",
+        description="Fades the banding out toward the poles, into mottled "
+                    "texture. Higher = a more complete fade; 0 = off, bands "
+                    "stay crisp all the way up. The latitude window is fixed, "
+                    "so this sets how far the fade goes, not how far down it "
+                    "reaches (contrast collapse poleward of ~45 deg — the real latitude-contrast "
+                    "profile)",
     )
     lane_density: float = pfield(
         0.0, tier=Tier.VELOCITY, lo=0.0, hi=1.0, rand=(0.0, 0.8), adv=True, ui="Bands",
-        description="Thin dark lane lines at jet cores, drawn analytically at "
-                    "derive time (a 1-3 px line cannot survive the sim grid)",
+        description="Thin dark lane lines running along the jet cores. "
+                    "Higher = more of them, though each lane's darkness is "
+                    "seeded and does not change; 0 = off (drawn "
+                    "analytically at derive time — a 1-3 px line cannot "
+                    "survive the sim grid)",
     )
     edge_diversity: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=1.0, rand=(0.2, 0.8), adv=True, ui="Bands",
-        description="Per-edge softness variation: some band edges diffuse, some "
-                    "sharp (uniform edges are a procedural tell)",
+        description="Varies softness edge by edge, so some band edges are "
+                    "diffuse and some sharp. Higher = a wider spread of edge "
+                    "styles; 0 = off, every edge shares one softness (per-edge "
+                    "softness variation; uniform edges are a procedural tell)",
     )
     width_tail: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=1.0, rand=(0.0, 0.7), adv=True, ui="Bands",
-        description="Heavier-tailed band width distribution (real maps mix very "
-                    "broad zones with thin strips)",
+        description="Pushes the band widths toward extremes, mixing very broad "
+                    "bands with thin ones. Higher = a more lopsided mix; 0 = "
+                    "off (a heavier-tailed width distribution — real maps mix "
+                    "very broad zones with thin strips)",
     )
     detail_freq: float = pfield(
         12.0, tier=Tier.RESTART, lo=2.0, hi=64.0, rand=(6.0, 24.0), log=True, adv=True, ui="Bands",
         label="Band detail scale",
-        description="Small-scale noise spatial frequency",
+        description="Size of the fine color mottling inside each band (the "
+                    "amount of it is bands.detail_amount). Higher = finer "
+                    "grain; lower = broader blotches (small-scale noise "
+                    "spatial frequency)",
     )
     template: BandTemplate | None = pfield(
         None, tier=Tier.RESTART, adv=True, ui="Bands",
@@ -370,7 +437,10 @@ class SimParams(_Params):
     dt_scale: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.2, hi=3.0, ui="Simulation",
         label="Time step",
-        description="Time-step multiplier (peak jet displacement ~1.2 cells at 1.0)",
+        description="How far the flow moves per sim step. Higher = faster "
+                    "development but a coarser, less stable solve "
+                    "(time-step multiplier; peak jet displacement ~1.2 "
+                    "cells at 1.0)",
     )
     resolution_invariant: bool = pfield(
         False, tier=Tier.RESTART, adv=True, ui="Simulation",
@@ -390,21 +460,30 @@ class SimParams(_Params):
 class JetsParams(_Params):
     strength: float = pfield(
         1.0, tier=Tier.VELOCITY, lo=0.0, hi=3.0, rand=(0.6, 1.6), ui="Jets",
-        description="Global zonal jet speed multiplier",
+        description="Overall speed of every east-west jet. Higher = more "
+                    "shear, so the bands stretch and smear faster; 0 = no "
+                    "east-west jets, though storms and churn still move the "
+                    "clouds (global zonal jet speed multiplier)",
     )
     equatorial_speed: float = pfield(
         1.6, tier=Tier.VELOCITY, lo=-3.0, hi=4.0, rand=(0.5, 2.5), ui="Jets",
-        description="Equatorial superrotation jet peak speed (negative ="
-                    " retrograde, flowing against the planet's rotation)",
+        description="Peak speed of the equatorial jet. Higher = a faster, more "
+                    "sheared equator; negative = retrograde, flowing against "
+                    "the planet's rotation (the superrotation jet)",
     )
     equatorial_width: float = pfield(
         0.12, tier=Tier.VELOCITY, lo=0.03, hi=0.4, rand=(0.07, 0.25), ui="Jets",
-        description="Equatorial jet half-width, radians of latitude"
-                    " (1 rad = 57.3 deg; default 0.12 rad is about 7 deg)",
+        description="How far the equatorial jet spreads in latitude. Higher = "
+                    "a broader, gentler equator (jet half-width, in radians of "
+                    "latitude; 1 rad = 57.3 deg, and the default 0.12 rad is "
+                    "about 7 deg)",
     )
     polar_decay: float = pfield(
         0.5, tier=Tier.VELOCITY, lo=0.0, hi=1.0, rand=(0.3, 0.8), ui="Jets",
-        description="How strongly jet amplitudes decay toward the poles",
+        description="How much the jets weaken toward the poles. Higher = a "
+                    "calm, flat polar cap with the motion confined to low "
+                    "latitudes; 0 = no EXTRA weakening, though a separate "
+                    "polar fade always applies near the pole",
     )
     local_jet_speed: float = pfield(
         0.0, tier=Tier.RESTART, lo=-3.0, hi=3.0, adv=True, ui="Jets",
@@ -458,8 +537,10 @@ class JetsParams(_Params):
     )
     hero_bracket_south_offset: float = pfield(
         -1.0, tier=Tier.RESTART, lo=-4.0, hi=0.0, adv=True, ui="Hero Bracket",
-        description="Poleward-flank jet center offset, in units of the hero core radius "
-                    "(jet center latitude = hero_latitude + this * hero_radius)",
+        description="How far the poleward-flank jet sits from the storm "
+                    "center. Measured in units of the hero CORE RADIUS, so the "
+                    "bracket keeps straddling the storm as it is resized (jet "
+                    "center latitude = hero_latitude + this * hero_radius)",
     )
     hero_bracket_window: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=4.0, adv=True, ui="Hero Bracket",
@@ -474,68 +555,104 @@ class JetsParams(_Params):
     )
     hero_bracket_north_width: float = pfield(
         0.8, tier=Tier.RESTART, lo=0.1, hi=2.0, adv=True, ui="Hero Bracket",
-        description="Equatorward-flank jet gaussian half-width, in units of the hero core "
-                    "radius",
+        description="How wide the equatorward-flank jet spreads. Measured in "
+                    "units of the hero core radius, so it tracks storm size "
+                    "(gaussian half-width)",
     )
     hero_bracket_south_width: float = pfield(
         0.8, tier=Tier.RESTART, lo=0.1, hi=2.0, adv=True, ui="Hero Bracket",
-        description="Poleward-flank jet gaussian half-width, in units of the hero core "
-                    "radius",
+        description="How wide the poleward-flank jet spreads. Measured in "
+                    "units of the hero core radius, so it tracks storm size "
+                    "(gaussian half-width)",
     )
 
 
 class TurbulenceParams(_Params):
     intensity: float = pfield(
         1.0, tier=Tier.VELOCITY, lo=0.0, hi=3.0, rand=(0.5, 1.8), ui="Turbulence",
-        description="Global turbulence (curl-noise) amplitude",
+        description="Overall amount of churn everywhere on the planet. Higher = "
+                    "every band looks busier; 0 = no churn of its own, though "
+                    "band-edge billows and storms still stir the clouds "
+                    "(global turbulence amplitude, from curl noise)",
     )
     shear_coupling: float = pfield(
         1.0, tier=Tier.VELOCITY, lo=0.0, hi=3.0, rand=(0.5, 1.5), adv=True, ui="Turbulence",
-        description="Extra turbulence where jet shear is strong",
+        description="Extra churn where neighboring jets meet. Higher = "
+                    "band edges churn while band interiors stay calm; 0 = "
+                    "turbulence that ignores jet shear entirely (belt_boost "
+                    "still applies, so coverage is not perfectly even)",
     )
     belt_boost: float = pfield(
         1.6, tier=Tier.VELOCITY, lo=1.0, hi=4.0, rand=(1.2, 2.5), ui="Turbulence",
-        description="Turbulence multiplier inside dark belts (cyclonic ="
-                    " spinning with the local planetary rotation; the"
-                    " storm-prone bands)",
+        description="Extra churn inside the dark belts only. Higher = the belts "
+                    "look rougher than the pale, calm zones; 1.0 = "
+                    "belts churn no differently from zones (turbulence "
+                    "multiplier for belts, which are cyclonic — spinning with "
+                    "the local planetary rotation — and are the storm-prone "
+                    "bands)",
     )
     scale: float = pfield(
         6.0, tier=Tier.VELOCITY, lo=1.0, hi=32.0, rand=(4.0, 12.0), log=True,
         adv=True, ui="Turbulence",
-        description="Base spatial frequency of the turbulence noise",
+        description="Size of the churn features. Higher = smaller, busier "
+                    "stirring; lower = broad, coarse swirls (base spatial frequency "
+                    "of the turbulence noise)",
     )
     evolution_rate: float = pfield(
         0.012, tier=Tier.VELOCITY, lo=0.0, hi=0.1, adv=True, ui="Turbulence",
-        description="How fast the turbulence pattern decorrelates per step",
+        description="How fast the churn pattern reshuffles as the sim runs. "
+                    "Higher = the pattern never settles; 0 = a pattern frozen "
+                    "in place, which the clouds then drift through (per-step "
+                    "rate at which the turbulence decorrelates)",
     )
     relax_tau: float = pfield(
         350.0, tier=Tier.RESTART, lo=50.0, hi=2000.0, log=True, adv=True, ui="Turbulence",
         label="Turbulence leash",
-        description="Relaxation time (steps) pulling band color/height back toward the stamp",
+        description="How hard the bands are pulled back to their painted look "
+                    "after the flow smears them. Higher = a longer leash, so "
+                    "churn stays visible for longer "
+                    "(relaxation time in steps, pulling band color and height "
+                    "back toward the stamp)",
     )
     replenish_rate: float = pfield(
         0.015, tier=Tier.RESTART, lo=0.0, hi=0.5, ui="Turbulence",
-        description="Fresh detail-noise blended into the detail tracer per step. "
-                    "High values (~0.3) keep quiescent zone bands detailed where the "
-                    "zonal jets would otherwise smear the detail away to ~half the belts'",
+        description="Fresh detail-noise fed to the whole planet every step, so "
+                    "texture does not wash out as the flow stretches it. High "
+                    "values (~0.3) keep the quiet pale zone bands as detailed as "
+                    "the belts, which the east-west jets would otherwise smear "
+                    "away to ~half (blended into the detail tracer)",
     )
     kh_amplitude: float = pfield(
         0.35, tier=Tier.VELOCITY, lo=0.0, hi=2.0, rand=(0.1, 0.8), adv=True, ui="Turbulence",
         label="Billow strength",
-        description="Kelvin-Helmholtz wave amplitude along high-shear band boundaries",
+        description="How far a band edge billows where fast and slow jets "
+                    "meet. Higher = deeper scallops along the boundary; 0 = "
+                    "no billows, though the edge still meanders (see "
+                    "warp_amount) — Kelvin-Helmholtz wave amplitude "
+                    "along high-shear band boundaries",
     )
     kh_wavenumber: int = pfield(
         24, tier=Tier.VELOCITY, lo=4, hi=80, rand=(14, 40), adv=True, ui="Turbulence",
         label="Billow count",
-        description="KH billow longitudinal wavenumber",
+        description="How many billows fit around the planet along a band edge. "
+                    "Higher = more, tighter scallops (longitudinal wavenumber of "
+                    "the Kelvin-Helmholtz train)",
     )
     belt_replenish: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=0.08, adv=True, ui="Turbulence",
-        description="Extra fine detail-noise replenished per step inside belts (emergent filaments)",  # noqa: E501
+        description="Extra fine detail-noise fed to the belts alone per step, on "
+                    "top of replenish_rate, so belt texture keeps regenerating "
+                    "instead of smearing flat. Higher = more of it, so the "
+                    "belts read busier; 0 = off (belt_replenish_scale sets "
+                    "how fine it is)",
     )
     belt_replenish_scale: float = pfield(
         2.0, tier=Tier.RESTART, lo=1.0, hi=4.0, adv=True, ui="Turbulence",
-        description="Belt replenishment frequency multiplier relative to the base detail frequency",
+        description="How fine that belt-only detail is next to the planet's base "
+                    "detail. Higher = finer filaments; 1.0 = the same "
+                    "size as everything else (belt replenishment frequency "
+                    "multiplier, relative to the base detail frequency; only "
+                    "bites when belt_replenish is above 0)",
     )
 
 
@@ -608,10 +725,11 @@ class StormOverride(_Params):
     )
     strength_scale: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=3.0, ui="Cast",
-        description="Multiplier on the per-kind base vorticity law: hero "
-                    "0.045*hero_strength, oval 0.012*(radius/0.03), barge "
-                    "-0.006, pearl 0.008. 1.0 = the kind's default strength; "
-                    "0 = a color-only stamp with no circulation",
+        description="How strongly this storm spins, next to others of its "
+                    "kind. 1.0 = the kind's default strength; 0 = a "
+                    "color-only stamp with no circulation (multiplier on the "
+                    "per-kind base vorticity law: hero 0.045*hero_strength, "
+                    "oval 0.012*(radius/0.03), barge -0.006, pearl 0.008)",
     )
     tint: float | None = pfield(
         None, tier=Tier.RESTART, lo=-1.0, hi=1.0, ui="Cast",
@@ -629,8 +747,9 @@ class StormOverride(_Params):
     )
     aspect: float = pfield(
         1.0, tier=Tier.RESTART, lo=1.0, hi=3.0, ui="Cast",
-        description="lon:lat elongation of the stamp (1.0 = round). Stretches "
-                    "the iso-contours along longitude, like hero_aspect",
+        description="Elongation of the stamp, lon:lat. 1.0 = round; higher = "
+                    "stretched along longitude, like hero_aspect (stretches "
+                    "the iso-contours)",
     )
     # -- hero-only per-storm levers (inert on oval/barge/pearl kinds) ------
     wake_dir: WakeDir | None = pfield(
@@ -648,8 +767,8 @@ class StormOverride(_Params):
     )
     companion_aspect: float | None = pfield(
         None, tier=Tier.RESTART, lo=1.0, hi=5.0, adv=True, ui="Companions",
-        description="lon:lat elongation of this hero's companion pearls. None "
-                    "inherits the global storms.companion_aspect",
+        description="Elongation of this hero's companion pearls, lon:lat. "
+                    "None inherits the global storms.companion_aspect",
     )
     companion_brightness: float | None = pfield(
         None, tier=Tier.RESTART, lo=0.0, hi=0.8, adv=True, ui="Companions",
@@ -796,20 +915,27 @@ class StormsParams(_Params):
     # -- Hero -----------------------------------------------------------
     hero_count: int = pfield(
         1, tier=Tier.RESTART, lo=0, hi=3, rand=(0, 2), ui="Hero",
-        description="Giant anticyclones of Great Red Spot (GRS) class — the"
-                    " planet-dominating bright/red oval storms (co-rotates with"
+        description="How many Great Red Spot (GRS) class storms to place. "
+                    "These are the giant, planet-dominating bright/red oval "
+                    "anticyclones; 0 = none (each co-rotates with"
                     " the local ambient shear vorticity of the zone it sits in,"
                     " which is what lets it persist against differential shear"
                     " instead of getting torn apart)",
     )
     hero_radius: float = pfield(
         0.10, tier=Tier.RESTART, lo=0.03, hi=0.25, rand=(0.06, 0.16), ui="Hero",
-        description="Hero vortex core radius, radians of arc (1 rad = 57.3"
-                    " deg; default 0.10 rad is about 5.7 deg — GRS-scale)",
+        description="How big the hero storm's core is. Higher = a larger "
+                    "spot, and the hero jet bracket scales with it (hero "
+                    "vortex core radius, in radians of arc; 1 rad = 57.3"
+                    " deg, and the default 0.10 rad is about 5.7 deg — "
+                    "GRS-scale)",
     )
     hero_strength: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.2, hi=3.0, rand=(0.7, 1.6), ui="Hero",
-        description="GRS-class hero storm vorticity amplitude",
+        description="How strongly the hero storm spins. Higher = a tighter, "
+                    "faster-whirling spot; the slider bottoms out at 0.2, so "
+                    "the hero always carries some circulation (GRS-class hero "
+                    "storm vorticity amplitude)",
     )
     hero_latitude: float | None = pfield(
         None, tier=Tier.RESTART, lo=-55.0, hi=55.0, adv=True, ui="Hero",
@@ -940,7 +1066,10 @@ class StormsParams(_Params):
     )
     wake_turbulence: float = pfield(
         1.8, tier=Tier.RESTART, lo=0.0, hi=5.0, rand=(1.0, 3.0), adv=True, ui="Hero",
-        description="Turbulence boost in the wake wedge downstream of hero storms",
+        description="Extra churn in the wake wedge downstream of the hero "
+                    "storm. Higher = a rougher, more disturbed trail; 0 = no "
+                    "boost at all (turbulence boost; the default 1.8 is "
+                    "already a strong one)",
     )
     hero_tint: float = pfield(
         0.9, tier=Tier.RESTART, lo=-1.0, hi=1.0, adv=True, ui="Hero",
@@ -1003,8 +1132,9 @@ class StormsParams(_Params):
     )
     hero_shape_seed: int = pfield(
         0, tier=Tier.RESTART, lo=0, hi=99999, adv=True, ui="Hero",
-        description="Re-rolls the hero's seeded shape lobes on their own "
-                    "substream of the master seed — changing it never "
+        description="Re-rolls the hero's seeded shape lobes. Change it to try "
+                    "a different silhouette; it runs on its own substream of "
+                    "the master seed, so changing it never "
                     "perturbs any other seeded draw",
     )
     hero_taper: float = pfield(
@@ -1012,7 +1142,8 @@ class StormsParams(_Params):
         description="Upstream-end wedge taper: the reference GRS's boundary "
                     "converges toward a point on the side the flow arrives "
                     "from (measured 20-40% of local radius), while the wake "
-                    "end stays blunt. Deterministic (no seed), follows "
+                    "end stays blunt. Higher = a sharper wedge; 0 = off. "
+                    "Deterministic (no seed), follows "
                     "hero_wake_dir, deepest at ~35 deg off the upstream tip "
                     "in the aspect-squashed frame (physically closer to the "
                     "tip on an elongated hero — ~14 deg at aspect 2.9); "
@@ -1039,7 +1170,9 @@ class StormsParams(_Params):
     # -- Ovals ------------------------------------------------------------
     oval_density: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=4.0, rand=(0.4, 1.8), ui="Ovals",
-        description="White-oval anticyclone population multiplier",
+        description="How many white ovals populate the zones. Higher = a more "
+                    "crowded field of these bright anticyclones; 0 = none "
+                    "(white-oval population multiplier)",
     )
     oval_solid_core: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=1.0, adv=True, ui="Ovals",
@@ -1060,9 +1193,10 @@ class StormsParams(_Params):
     # A01): a shared scalar group — count 0-2, one latitude, one appearance.
     accent_count: int = pfield(
         0, tier=Tier.RESTART, lo=0, hi=2, adv=True, ui="Accents",
-        description="Accent ovals: KIND_OVAL storms with EXPLICIT color (the "
-                    "Oval BA 'second red spot' unlock — a red oval beside the "
-                    "white population). Seeded on their own substream after the "
+        description="Places accent ovals — KIND_OVAL storms with an EXPLICIT "
+                    "color, the Oval BA 'second red spot' unlock (a red oval "
+                    "beside the white population). Seeded on their own "
+                    "substream after the "
                     "population cap, so the base storm field is untouched; "
                     "count=2 places a pair at offset longitudes with identical "
                     "appearance. 0 = off (byte-identical)",
@@ -1115,23 +1249,31 @@ class StormsParams(_Params):
     # -- Barges -------------------------------------------------------------
     barge_density: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=3.0, rand=(0.3, 1.5), ui="Barges",
-        description="Brown-barge cyclone population multiplier (belts)",
+        description="How many brown barges populate the belts. Higher = more "
+                    "of these dark elongated cyclones; 0 = none (brown-barge "
+                    "cyclone population multiplier)",
     )
 
     # -- Pearls -------------------------------------------------------------
     pearls_count: int = pfield(
         7, tier=Tier.RESTART, lo=0, hi=14, rand=(0, 9), ui="Pearls",
-        description="String-of-pearls ovals on one seeded latitude (0 = off)",
+        description="How many string-of-pearls ovals sit on one seeded "
+                    "latitude. Higher = a longer chain; 0 = off",
     )
 
     # -- Outbreaks ------------------------------------------------------
     outbreak_count: int = pfield(
         0, tier=Tier.RESTART, lo=0, hi=3, rand=(0, 2), adv=True, ui="Outbreaks",
-        description="Convective outbreaks (Great-White-Spot events) during the development run",
+        description="How many convective outbreaks erupt during the "
+                    "development run. Higher = more; 0 = off "
+                    "(Great-White-Spot events)",
     )
     outbreak_strength: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.2, hi=3.0, adv=True, ui="Outbreaks",
-        description="Convective outbreak vorticity amplitude",
+        description="How violently each outbreak erupts. Higher = a bigger, "
+                    "brighter plume; the floor is 0.2, so an outbreak always "
+                    "carries some circulation (convective outbreak vorticity "
+                    "amplitude)",
     )
     outbreak_latitude: float | None = pfield(
         None, tier=Tier.RESTART, lo=-55.0, hi=55.0, adv=True, ui="Outbreaks",
@@ -1181,7 +1323,9 @@ class StormsParams(_Params):
     )
     stamp_contrast: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=3.0, rand=(0.8, 1.3), adv=True, ui="Small storms",
-        description="Tracer-stamp contrast of ovals/barges/pearls/small storms (1 = v1)",
+        description="How strongly the small storms stamp into the tracer. "
+                    "Higher = crisper ovals, barges and pearls against the "
+                    "band; 1 = the v1 look (tracer-stamp contrast)",
     )
     stamp_tint_contrast: float | None = pfield(
         None, tier=Tier.RESTART, lo=0.0, hi=3.0, adv=True, ui="Small storms",
@@ -1203,15 +1347,17 @@ class StormsParams(_Params):
     )
     merge_debris: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=2.0, adv=True, ui="Mergers",
-        description="Brightness of the transient turbulent collar a fresh "
-                    "merger leaves behind (inert while merge_rate is 0)",
+        description="How bright the transient turbulent collar is that a "
+                    "fresh merger "
+                    "leaves behind. Higher = a more visible scar; inert while "
+                    "merge_rate is 0",
     )
 
     # -- Cast (art-directed storms) ----------------------------------------
     cast: list[StormOverride] = pfield(
         factory=list, tier=Tier.RESTART, adv=True, ui="Cast",
-        description="Cast list: storms placed by hand (kind + rendered "
-                    "position + size + optional color). Each entry is stamped "
+        description="Cast list — storms placed by hand: kind, rendered "
+                    "position, size, and optional color. Each entry is stamped "
                     "verbatim after the seeded populations, exempt from the "
                     "population cap and runtime mergers, so a director's storm "
                     "survives the whole run where it was placed. Empty (the "
@@ -1266,27 +1412,33 @@ class StormsParams(_Params):
 class WavesParams(_Params):
     festoon_strength: float = pfield(
         0.8, tier=Tier.RESTART, lo=0.0, hi=3.0, rand=(0.0, 1.4), ui="Waves",
-        description="Festoon plumes + hot spots on the equatorial belt edge (0 = off)",
+        description="Scalloped plumes and dark hot spots along the equatorial "
+                    "belt edge. Higher = deeper, more pronounced festoons; "
+                    "0 = off",
     )
     festoon_wavenumber: int = pfield(
         12, tier=Tier.RESTART, lo=4, hi=24, rand=(8, 16), ui="Waves",
         label="Festoon count",
-        description="How many festoon plumes fit around the equator "
-                    "(higher = more, smaller plumes; the Rossby wavenumber of "
-                    "the train)",
+        description="How many festoon plumes fit around the equator. Higher = "
+                    "more, smaller plumes (the Rossby wavenumber of the train)",
     )
     hotspot_depth: float = pfield(
         0.6, tier=Tier.RESTART, lo=0.0, hi=1.0, rand=(0.2, 0.9), ui="Waves",
-        description="Depth of the cloud-free hot spots at the wave troughs",
+        description="How dark the cloud-free hot spots read in the festoon wave "
+                    "troughs. Higher = deeper, higher-contrast gaps between the "
+                    "plumes; 0 = no gaps at all",
     )
     ribbon_strength: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=3.0, rand=(0.0, 1.0), ui="Waves",
-        description="Saturn-style ribbon wave on one mid-latitude jet (0 = off)",
+        description="Saturn-style ribbon wave running along one mid-latitude "
+                    "jet. Higher = a stronger meander in that jet's edge; 0 = off",
     )
     ribbon_wavenumber: int = pfield(
         12, tier=Tier.RESTART, lo=4, hi=30, ui="Waves",
         label="Ribbon wave count",
-        description="Wavenumber of the Saturn-style ribbon wave",
+        description="How many meanders the ribbon wave makes around the planet. "
+                    "Higher = tighter, more frequent meanders (wavenumber of the "
+                    "Saturn-style ribbon wave)",
     )
     festoon_hero_strength: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=3.0, adv=True, ui="Waves",
@@ -1301,53 +1453,73 @@ class WavesParams(_Params):
     festoon_hero_wavenumber: int = pfield(
         11, tier=Tier.RESTART, lo=4, hi=24, adv=True, ui="Waves",
         label="Festoon count (hero)",
-        description="Wavenumber of the hero-adjacent festoon train (the "
-                    "default deliberately differs from festoon_wavenumber — "
-                    "twin wavenumbers read as a mechanical comb)",
+        description="How many plumes fit in the hero-adjacent festoon train. "
+                    "Keep it different from festoon_wavenumber — two trains at "
+                    "matching spacing read as a mechanical comb, which is why "
+                    "the default deliberately differs (the train's wavenumber)",
     )
 
 
 class DetailParams(_Params):
     intensity: float = pfield(
         0.55, tier=Tier.POST, lo=0.0, hi=2.0, rand=(0.3, 0.9), ui="Detail",
-        description="Export/preview detail synthesis amplitude",
+        description="How much synthesized detail is laid over the planet. "
+                    "Higher = more texture everywhere; 0 = off, and the "
+                    "detail-FX levers below go inert with it (export/preview "
+                    "detail synthesis amplitude)",
     )
     flow_phases: int = pfield(
         3, tier=Tier.POST, lo=1, hi=4, ui="Detail",
-        description="Staggered advected-noise phases (more = richer filaments)",
+        description="How many staggered noise phases the detail is built "
+                    "from. More = richer, more layered filaments (staggered "
+                    "advected-noise phases)",
     )
     flow_stretch: float = pfield(
         1.0, tier=Tier.POST, lo=0.1, hi=4.0, rand=(0.6, 1.6), ui="Detail",
-        description="How far detail noise is advected along the flow",
+        description="How far the detail noise is smeared along the flow. "
+                    "Higher = longer, more drawn-out streaks (advection "
+                    "distance for the detail noise)",
     )
     frequency: float = pfield(
         48.0, tier=Tier.POST, lo=8.0, hi=256.0, log=True, ui="Detail",
-        description="Base spatial frequency of the detail noise",
+        description="Size of the synthesized detail. Higher = finer grain; "
+                    "lower = coarser, broader texture (base spatial frequency "
+                    "of the detail noise)",
     )
     cellular_amount: float = pfield(
         0.6, tier=Tier.POST, lo=0.0, hi=2.0, rand=(0.3, 1.0), ui="Detail",
-        description="Convective cell (closed-cell/popcorn) texture in quiet zones",
+        description="Popcorn-like convective cell texture in the quiet zones. "
+                    "Higher = a more granular, cauliflower zone; 0 = off "
+                    "(closed-cell texture)",
     )
     striation_amount: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.5, rand=(0.2, 0.8), ui="Detail",
-        description="Ropey flow-parallel striations inside belts (intra-band "
-                    "thread texture; 0 = the pre-v1.1 look)",
+        description="Ropey threads running along the flow inside the belts. "
+                    "Higher = a more strongly combed belt; 0 = the pre-v1.1 "
+                    "look (intra-band flow-parallel striation thread "
+                    "texture)",
     )
     striation_frequency: float = pfield(
         96.0, tier=Tier.POST, lo=16.0, hi=512.0, log=True, ui="Detail",
-        description="Base spatial frequency of the striation noise",
+        description="How fine the striation threads are. Higher = tighter, "
+                    "thinner ropes (base spatial frequency of the striation "
+                    "noise)",
     )
     polar_stipple: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.0, rand=(0.3, 1.0), ui="Detail",
-        description="Bright granular storm speckle (popcorn) poleward of ~55 deg "
-                    "(the band-to-mottle transition character)",
+        description="Bright granular storm speckle poleward of ~55 deg. "
+                    "Higher = a more heavily flecked cap; 0 = off (popcorn — "
+                    "the band-to-mottle transition character)",
     )
     intermittency: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, ui="Detail", fx=True,
-        description="Longitudinal patchiness of the filament/striation texture: "
-                    "violent folded patches abutting calm laminar runs (the real "
-                    "mosaic's chaos is intermittent, not uniform). No rand: a "
-                    "draw here would reshuffle every later randomize draw",
+        description="Breaks the filament and striation texture into patches "
+                    "along each band, so violent folded stretches abut calm "
+                    "laminar runs. Higher = a more broken-up mosaic; 0 = off, "
+                    "the texture stays uniform (longitudinal patchiness — the "
+                    "real mosaic's chaos is intermittent, not uniform). No "
+                    "rand: a draw here would reshuffle every later randomize "
+                    "draw",
     )
     hero_calm: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, adv=True, ui="Detail",
@@ -1362,10 +1534,11 @@ class DetailParams(_Params):
     )
     hero_spiral: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.5, ui="Detail", fx=True,
-        description="Tightly wound internal spiral lanes inside hero storms "
-                    "(the Juno-close-up GRS look) plus collar streamlines; "
-                    "winds in the hero's actual rotation sense. Stationary in "
-                    "the hero frame — fine for stills",
+        description="Tightly wound spiral lanes inside the hero storm, plus "
+                    "collar streamlines. Higher = a more strongly drawn "
+                    "spiral; 0 = off (the Juno-close-up GRS look; winds in the "
+                    "hero's actual rotation sense). Stationary in the hero "
+                    "frame — fine for stills",
     )
     hero_collar_wrap: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, ui="Detail", fx=True,
@@ -1387,23 +1560,27 @@ class DetailParams(_Params):
     )
     belt_texture: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.5, ui="Detail", fx=True,
-        description="Storm-scale folded luminance structure inside belts "
-                    "(0.5-3 deg, flow-backtraced so patches fold with the "
-                    "flow) + a belt floor for the fine filaments; the v1.4 "
-                    "audit's dominant texture gap on broad-band layouts",
+        description="Storm-scale folded structure inside the belts, at 0.5-3 "
+                    "deg across. Higher = a busier, more mottled belt "
+                    "interior; 0 = off (folded luminance structure, "
+                    "flow-backtraced so patches fold with the flow, plus a "
+                    "belt floor for the fine filaments — the v1.4 audit's "
+                    "dominant texture gap on broad-band layouts)",
     )
     belt_texture_fine: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.5, ui="Detail", fx=True,
-        description="Finer sub-grid belt fold octave: a second flow-aligned "
-                    "backtrace hop folds mid-frequency noise below the sim "
-                    "grid scale, densifying belt texture at matched scale",
+        description="A finer second octave of that belt fold, below the sim "
+                    "grid scale. Higher = denser belt texture at matched "
+                    "scale; 0 = off (a finer sub-grid octave: a second "
+                    "flow-aligned backtrace hop, folding mid-frequency "
+                    "noise)",
     )
     mottle: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.5, ui="Detail", fx=True,
-        description="Temperate lace mottle (35-60 deg): granular bright "
-                    "rings, dark dots, and lacy folds where banding gives "
-                    "way -- the reference's mid-latitude storm-flecked "
-                    "character",
+        description="Temperate lace mottle at 35-60 deg: granular bright "
+                    "rings, dark dots, and lacy folds where the banding gives "
+                    "way. Higher = a more flecked mid-latitude; 0 = off (the "
+                    "reference's mid-latitude storm-flecked character)",
     )
     polar_filaments: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.0, adv=True, ui="Detail", fx=True,
@@ -1507,9 +1684,11 @@ class BaroclinicParams(_Params):
 
     enabled: bool = pfield(
         False, tier=Tier.RESTART, adv=True, ui="Solver",
-        description="Inject the evolving baroclinic vorticity source into the "
-                    "vorticity solver (adds physically-grounded mid-latitude "
-                    "storms; requires solver type=vorticity). Off = plain v1.6. "
+        description="Adds physically-grounded mid-latitude storms, grown by a "
+                    "baroclinic instability model, in addition to the "
+                    "hand-seeded ones. "
+                    "Off = plain v1.6; requires solver type=vorticity (injects "
+                    "the evolving baroclinic vorticity source into the solver). "
                     "No rand: randomize() must never silently enable it.")
     gain: float = pfield(
         2.0, tier=Tier.RESTART, lo=0.0, hi=8.0, adv=True, ui="Solver",
@@ -1531,12 +1710,12 @@ class BaroclinicParams(_Params):
                     "blow-up so tests can force it)")
     baro_steps_per_update: int = pfield(
         150, tier=Tier.RESTART, lo=10, hi=1000, adv=True, ui="Fixed cadence",
-        description="Internal pacing of the baroclinic storm generator — leave "
+        description="Internal pacing of the baroclinic storm generator; leave "
                     "at default (baroclinic steps per source refresh; fixed "
                     "cadence, no rand)")
     update_every: int = pfield(
         32, tier=Tier.RESTART, lo=1, hi=512, adv=True, ui="Fixed cadence",
-        description="Internal pacing of the baroclinic storm generator — leave "
+        description="Internal pacing of the baroclinic storm generator; leave "
                     "at default (main-solver steps between source refreshes; "
                     "fixed cadence, no rand)")
 
@@ -1568,7 +1747,7 @@ class SolverParams(_Params):
     deformation_radius: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=3.14, adv=True, ui="Solver",
         label="Storm reach (0 = unlimited)",
-        description="Storm locality: how far each vortex's swirl reaches. "
+        description="Storm locality — how far each vortex's swirl reaches. "
                     "Smaller = more local — a dominant hero stirs its own band "
                     "without destabilizing the rest of the map; 0 = off "
                     "(infinite reach, plain 2D, byte-identical). Values in the "
@@ -1601,9 +1780,12 @@ class SolverParams(_Params):
                     "f = f0*sin(lat), sets the Rhines/band scale; vorticity mode)")
     vort_inject: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=5.0, adv=True, ui="Solver",
         label="Churn strength",
-        description="Broadband eddy-vorticity injection amplitude per step; the "
-                    "jet shear folds it into filaments (the emergent-turbulence "
-                    "source; 0 = off, smooth jets stay zonal). Vorticity mode.")
+        description="Feeds fresh churn into the flow every step, which the jet "
+                    "shear then folds into filaments. Higher = busier, more "
+                    "turbulent bands; 0 = off, and the jets stay smooth and "
+                    "east-west (broadband eddy-vorticity injection amplitude "
+                    "per step — the emergent-turbulence source). Vorticity "
+                    "mode.")
     vort_inject_scale: float = pfield(0.5, tier=Tier.RESTART, lo=0.1, hi=4.0, adv=True, ui="Solver",
         label="Churn scale",
         description="Size of the injected churn: higher = finer speckle that "
@@ -1613,10 +1795,16 @@ class SolverParams(_Params):
     vort_inject_mask: InjectMask = pfield(
         InjectMask.GLOBAL, tier=Tier.RESTART, adv=True, ui="Solver",
         label="Churn placement",
-        description="Spatial localization of eddy injection: global = churn "
-                    "everywhere; belts = cyclonic dark bands only (anticyclonic "
-                    "zones stay smooth); shear = jet-shear flanks only (filaments "
-                    "where shear is high). Vorticity mode.")
+        description="Where the injected churn is allowed to land. global = "
+                    "everywhere; belts = the cyclonic dark bands only, leaving "
+                    "the anticyclonic zones smooth; shear = the jet-shear "
+                    "flanks only, so filaments form where shear is high. The "
+                    "mask multiplies vort_inject per pixel and is NOT "
+                    "normalized by how much it covers, so a wider mask puts "
+                    "more total churn in at the same amplitude — belts lets "
+                    "through several times what shear does, so retune "
+                    "vort_inject DOWN when you widen it (spatial localization "
+                    "of eddy injection). Vorticity mode.")
     vort_drag: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=0.3, adv=True, ui="Solver",
         label="Swirl brake (all scales)",
         description="Global brake on swirling: tames runaway planet-scale swirl "
@@ -1627,13 +1815,16 @@ class SolverParams(_Params):
                     "mode)")
     vort_eddy_drag: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=0.3, adv=True, ui="Solver",
         label="Eddy brake (all scales, jets spared)",
-        description="Linear drag fraction on the EDDY vorticity q - <q>_x (the "
-                    "deviation from the per-latitude zonal mean) per step. Leaves "
-                    "the zonal-mean jets intact, but is FLAT in wavenumber, so it "
-                    "damps medium eddies (festoons, band-edge waves) as hard as the "
-                    "gravest-mode swirl -> over-flattens the field. Prefer "
-                    "vort_psi_drag (scale-selective). Equirect only. 0 = off "
-                    "(byte-identical). Vorticity mode.")
+        description="Brake on everything that is not part of the east-west "
+                    "jets. It leaves the jets themselves intact, but damps "
+                    "mid-size features (festoons, band-edge waves) as hard as "
+                    "the gravest-mode planet-scale swirl, so the field "
+                    "over-flattens — "
+                    "prefer vort_psi_drag, which is scale-selective. 0 = off "
+                    "(byte-identical). Equirect only (linear drag fraction per "
+                    "step on the EDDY vorticity q - <q>_x, the deviation from "
+                    "the per-latitude zonal mean; FLAT in wavenumber). "
+                    "Vorticity mode.")
     vort_psi_drag: float = pfield(0.0, tier=Tier.RESTART, lo=0.0, hi=20.0, adv=True, ui="Solver",
         label="Swirl brake (large only)",
         description="Removes oversized planet-scale swirl while PRESERVING "
@@ -1694,24 +1885,34 @@ class PoleStyle(StrEnum):
 class PoleParams(_Params):
     style: PoleStyle = pfield(
         PoleStyle.CYCLONE_CLUSTER, tier=Tier.RESTART, ui="Poles",
-        description="Polar feature style",
+        description="Which polar feature sits over this pole. cyclone_cluster = a central "
+                    "cyclone ringed by others (Jupiter); polygon_jet = a "
+                    "hexagonal jet (Saturn); plain_vortex = one tight swirl; "
+                    "calm = nothing at all",
     )
     cyclone_count: int = pfield(
         6, tier=Tier.RESTART, lo=3, hi=9, rand=(5, 8), ui="Poles",
-        description="Ring cyclones around the central one (cyclone_cluster style)",
+        description="How many cyclones ring the central one. Higher = a "
+                    "denser rosette around the pole (cyclone_cluster style "
+                    "only)",
     )
     polygon_sides: int = pfield(
         6, tier=Tier.RESTART, lo=3, hi=9, ui="Poles",
-        description="Polygon wavenumber of the polar jet (polygon_jet style)",
+        description="How many sides the polar jet's polygon has. 6 = "
+                    "Saturn's hexagon (polygon wavenumber; polygon_jet "
+                    "style only)",
     )
     strength: float = pfield(
         1.0, tier=Tier.RESTART, lo=0.0, hi=3.0, rand=(0.6, 1.5), ui="Poles",
-        description="Polar feature vorticity amplitude (central cyclone / polygon jet)",
+        description="How strongly the polar feature swirls. Higher = a "
+                    "tighter, better-defined cap; 0 = flat (vorticity "
+                    "amplitude of the central cyclone / polygon jet)",
     )
     field_density: float = pfield(
         0.0, tier=Tier.RESTART, lo=0.0, hi=2.0, rand=(0.4, 1.4), ui="Poles",
-        description="Background small-cyclone field filling the cap poleward of "
-                    "70 deg (PIA21641's dense cyclone hierarchy; 0 = off)",
+        description="Fills the cap poleward of 70 deg with a background of "
+                    "small cyclones. Higher = a busier, more crowded pole; "
+                    "0 = off (the dense cyclone hierarchy of PIA21641)",
     )
 
 
@@ -1725,13 +1926,17 @@ class PolesParams(_Params):
 class AppearanceParams(_Params):
     palette_rows: list[PaletteRow] = pfield(
         factory=default_palette_rows, tier=Tier.POST, ui="Appearance",
-        description="Latitude-anchored color gradients indexed by the color tracer "
-                    "(belt dark -> zone bright), blended across signed latitude",
+        description="The planet's color gradients, one per latitude anchor. "
+                    "Each row runs belt dark -> zone bright and is indexed by "
+                    "the color tracer. Rows blend across SIGNED latitude, so a "
+                    "row placed in one hemisphere must be mirrored to act in "
+                    "the other",
     )
     storm_tints: list[GradientStop] = pfield(
         factory=lambda: [s.model_copy(deep=True) for s in DEFAULT_STORM_TINTS],
         tier=Tier.POST, adv=True, ui="Appearance",
-        description="Secondary tint axis for storms/festoons/hot spots",
+        description="Colors for storms, festoons and hot spots. A secondary "
+                    "tint axis, separate from the band palette rows",
     )
     band_tint_stops: list[GradientStop] = pfield(
         factory=lambda: [s.model_copy(deep=True) for s in DEFAULT_BAND_TINT],
@@ -1751,43 +1956,59 @@ class AppearanceParams(_Params):
     )
     haze_amount: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, rand=(0.0, 0.7), ui="Appearance",
-        description="Global haze: the Jupiter (0) to Saturn (~0.6) axis",
+        description="Milky overhead haze washing the whole planet. Higher = "
+                    "softer and creamier, the Saturn end (~0.6); 0 = off, the "
+                    "crisp Jupiter look (the global haze axis)",
     )
     haze_color: tuple[float, float, float] = pfield(
         (0.85, 0.78, 0.62), tier=Tier.POST, ui="Appearance",
-        description="Tint of the global haze blend (see haze_amount)",
+        description="Color of the global haze, its tint over the whole "
+                    "planet. Only visible once haze_amount is above 0 (see "
+                    "haze_amount)",
     )
     contrast: float = pfield(
         1.0, tier=Tier.POST, lo=0.2, hi=2.0, rand=(0.8, 1.2), ui="Appearance",
-        description="Color contrast multiplier about mid-gray",
+        description="Overall image contrast. Higher = punchier darks and "
+                    "brights; 1.0 = off (color contrast multiplier about "
+                    "mid-gray)",
     )
     saturation: float = pfield(
         1.0, tier=Tier.POST, lo=0.0, hi=2.0, rand=(0.7, 1.2), ui="Appearance",
-        description="sRGB saturation multiplier (luma-preserving mix toward gray); "
-                    "prefer chroma_scale for perceptual (Oklab) saturation",
+        description="Color intensity of the final image. Higher = more vivid, "
+                    "lower = toward gray; 1.0 = off. Prefer chroma_scale, "
+                    "which is perceptual (sRGB saturation multiplier, a "
+                    "luma-preserving mix toward gray; chroma_scale is the "
+                    "Oklab equivalent)",
     )
     gamma: float = pfield(
         1.0, tier=Tier.POST, lo=0.4, hi=2.5, ui="Appearance",
-        description="Final tone-curve gamma on the color map",
+        description="Final brightness curve on the color map. Higher = "
+                    "brighter midtones, lower = darker; 1.0 = off (tone-curve "
+                    "gamma, applied as pow(color, 1/gamma))",
     )
     chroma_scale: float = pfield(
         1.0, tier=Tier.POST, lo=0.0, hi=2.0, adv=True, ui="Appearance",
-        description="Oklab chroma multiplier on the final color (1 = off) — "
-                    "perceptual saturation, recommended over 'saturation' "
-                    "(an sRGB luma mix). No rand: adding a draw would "
-                    "reshuffle every later randomize draw",
+        description="How saturated the final color reads. Higher = richer "
+                    "color, lower = toward gray; 1 = off. Recommended over "
+                    "'saturation', which is an sRGB luma mix (Oklab chroma "
+                    "multiplier — perceptual saturation). No rand: adding a "
+                    "draw would reshuffle every later randomize draw",
     )
     chroma_variance: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=0.5, adv=True, ui="Appearance",
-        description="Longitudinal within-band chroma drift: bands hold pockets "
-                    "of more/less saturated material varying slowly with "
-                    "longitude (the reference's saturated-pocket texture)",
+        description="Slow saturation drift along each band, so it holds "
+                    "pockets of richer and duller material. Higher = more "
+                    "obvious pockets; 0 = off (longitudinal within-band chroma "
+                    "drift, varying slowly with longitude — the reference's "
+                    "saturated-pocket texture)",
     )
     hue_variance: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=0.35, adv=True, ui="Appearance",
-        description="Iso-luminance Oklab hue drift (radians of max rotation; "
-                    "1 rad = 57.3 deg): "
-                    "differently-hued material at the same lightness, which a "
+        description="Lets neighboring material differ in hue at the same "
+                    "brightness. Higher = a more varied, less monotone "
+                    "planet; 0 = off (iso-luminance Oklab hue drift, in "
+                    "radians of max rotation; 1 rad = 57.3 deg). "
+                    "Differently-hued material at the same lightness, which a "
                     "luminance-keyed palette gradient cannot express -- the "
                     "hue-diversity lever the realism metrics name",
     )
@@ -1820,11 +2041,13 @@ class AppearanceParams(_Params):
     )
     polar_tint_strength: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, rand=(0.2, 0.7), adv=True, ui="Appearance",
-        description="Polar tint blend strength (0 = off, the pre-v1.1 look)",
+        description="How strongly the polar cap tint is blended in. Higher = a "
+                    "bluer, more distinct cap; 0 = off, the pre-v1.1 look",
     )
     polar_tint_start_lat: float = pfield(
         55.0, tier=Tier.POST, lo=30.0, hi=80.0, adv=True, ui="Appearance",
-        description="Latitude (deg) where the polar tint begins",
+        description="Latitude where the polar tint starts to come in, in "
+                    "degrees. Higher = a smaller, tighter cap",
     )
     polar_canvas_value: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, rand=(0.0, 0.5), adv=True, ui="Appearance",
@@ -1849,10 +2072,11 @@ class EmissionParams(_Params):
 
     thermal_strength: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.0, adv=True, ui="Emission",
-        description="5-micron thermal glow through cloud gaps (gated on the "
-                    "cloud-top DEPRESSION vs the band stamp: hot-spot chains "
-                    "blaze, barges glow, belts glimmer, zones stay dark). "
-                    "Preview: Emission channel, not Color",
+        description="5-micron thermal glow shining up through gaps in the "
+                    "cloud deck. Higher = a hotter interior showing through; "
+                    "0 = off (gated on the cloud-top DEPRESSION vs the band "
+                    "stamp: hot-spot chains blaze, barges glow, belts glimmer, "
+                    "zones stay dark). Preview: Emission channel, not Color",
     )
     thermal_color: tuple[float, float, float] = pfield(
         (1.0, 0.36, 0.08), tier=Tier.POST, adv=True, ui="Emission",
@@ -1873,10 +2097,11 @@ class EmissionParams(_Params):
     )
     lightning_strength: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.0, adv=True, ui="Emission",
-        description="Frozen lightning-flash clusters in cyclonic belts and "
-                    "at high latitudes (the Juno look: light pools under the "
-                    "deck plus sparse HDR cores). Preview: Emission channel, not "
-                    "Color",
+        description="Frozen lightning-flash clusters in the cyclonic belts and "
+                    "at high latitudes. Higher = brighter, more visible "
+                    "flashes; 0 = off (the Juno look: light pools under the "
+                    "deck plus sparse HDR cores). Preview: Emission channel, "
+                    "not Color",
     )
     lightning_color: tuple[float, float, float] = pfield(
         (0.72, 0.82, 1.0), tier=Tier.POST, adv=True, ui="Emission",
@@ -1890,11 +2115,12 @@ class EmissionParams(_Params):
     )
     aurora_strength: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=2.0, adv=True, ui="Emission",
-        description="Auroral ovals around the (offset) magnetic poles; "
-                    "written to emission.exr's ALPHA channel so the importer "
-                    "can lift it onto a shell. Preview via the viewport's "
-                    "Emission channel (composited as alpha x aurora_color); "
-                    "not visible in the Color preview",
+        description="Auroral ovals ringing the (offset) magnetic poles. "
+                    "Higher = a brighter oval; 0 = off. Written to "
+                    "emission.exr's ALPHA channel so the importer can lift it "
+                    "onto a shell. Preview via the viewport's Emission channel "
+                    "(composited as alpha x aurora_color); not visible in the "
+                    "Color preview",
     )
     aurora_color: tuple[float, float, float] = pfield(
         (0.85, 0.35, 0.60), tier=Tier.POST, adv=True, ui="Emission",
@@ -1938,12 +2164,16 @@ class MaskParams(_Params):
 
     file: str | None = pfield(
         None, tier=Tier.POST, adv=True, ui="Mask",
-        description="Path to a grayscale equirect (2:1) PNG mask that paints WHERE "
-                    "the three Mask targets act (white = full effect, black = none). "
-                    "Use forward slashes. None = no mask (all Mask targets inert). "
-                    "The path is resolved relative to a loaded preset's folder and "
-                    "re-saved next to a preset you save, so a preset stays portable; "
-                    "a missing file at load warns and disables the mask (never crashes)",
+        description="Path to a grayscale PNG that paints WHERE the three Mask "
+                    "targets act — white = full effect, black = none. Use a "
+                    "2:1 equirect image (width exactly twice the height): any "
+                    "other aspect is refused with a warning and the mask stays "
+                    "off. Use forward slashes. "
+                    "None = no mask "
+                    "(all Mask targets inert). The path is resolved relative to "
+                    "a loaded preset's folder and re-saved next to a preset you "
+                    "save, so a preset stays portable; a missing file at load "
+                    "warns and disables the mask (never crashes)",
     )
     band_fade: float = pfield(
         0.0, tier=Tier.POST, lo=0.0, hi=1.0, adv=True, ui="Mask",
@@ -1972,16 +2202,22 @@ class PhysicalParams(_Params):
 
     radius_km: float = pfield(
         69911.0, tier=Tier.POST, lo=1000.0, hi=200000.0, adv=True, ui="Physical",
-        description="Planet equatorial radius in kilometers, passed through to the "
-                    "Blender importer for scale",
+        description="Planet equatorial radius in kilometers. A scale hint "
+                    "only: it changes nothing in the texture, and is passed "
+                    "through to the Blender importer",
     )
     height_scale: float = pfield(
         0.004, tier=Tier.POST, lo=0.0, hi=0.05, adv=True, ui="Physical",
-        description="Cloud-deck relief as a fraction of planet radius (full height-map range)",
+        description="How far the cloud deck stands out in relief. Higher = "
+                    "deeper displacement in Blender (a fraction of planet "
+                    "radius, across the full height-map range)",
     )
     height_midlevel: float = pfield(
         0.5, tier=Tier.POST, lo=0.0, hi=1.0, adv=True, ui="Physical",
-        description="Height-map value mapped to the mid cloud deck (Blender importer "
+        description="Which height-map value counts as the mid cloud deck: "
+                    "above it reads as raised cloud, below as a gap. Only "
+                    "used when the Blender import turns Displacement on — "
+                    "the default bump path ignores it (the importer's "
                     "reference level)",
     )
     ring_inner_km: float = pfield(
@@ -2024,11 +2260,14 @@ class RingsParams(_Params):
     )
     brightness: float = pfield(
         1.0, tier=Tier.POST, lo=0.0, hi=2.0, adv=True, ui="Rings",
-        description="Multiplier on the ice reflectance (ring RGB brightness)",
+        description="How bright the rings read. Higher = whiter, more "
+                    "reflective ice; 1.0 = the physically-derived value "
+                    "(multiplier on the ice reflectance, ring RGB)",
     )
     tint_color: tuple[float, float, float] = pfield(
         (0.86, 0.83, 0.78), tier=Tier.POST, adv=True, ui="Rings",
-        description="Slightly warm ice tint (linear RGB) applied to the ring particles",
+        description="Color of the ring ice. The default is a slightly warm "
+                    "off-white (linear RGB, applied to the ring particles)",
     )
     fine_grain: float = pfield(
         0.15, tier=Tier.POST, lo=0.0, hi=1.0, adv=True, ui="Rings",
@@ -2047,7 +2286,10 @@ class ProjectionKind(StrEnum):
 class ExportParams(_Params):
     width: int = pfield(
         2048, tier=Tier.POST, lo=512, hi=16384, ui="Export",
-        description="Equirect map width in pixels; height is width/2",
+        description="Map width in pixels. On the default equirect projection "
+                    "the height is half the width, the standard 2:1 ratio; on "
+                    "the cube projection each of the six faces is width/4 "
+                    "square instead",
     )
     projection: ProjectionKind = pfield(
         ProjectionKind.EQUIRECT, tier=Tier.POST, ui="Export",
@@ -2063,7 +2305,11 @@ class ExportParams(_Params):
     )
     png_compression: int = pfield(
         2, tier=Tier.POST, lo=0, hi=9, ui="Export",
-        description="PNG deflate level (low = much faster at 16K)",
+        description="How hard the color PNG is squeezed on export. Lower = "
+                    "much faster writes, which matters at 16K; higher = a "
+                    "smaller file. Only the color map uses it; the 16-bit "
+                    "height PNGs are always written at the default level "
+                    "(zlib deflate level)",
     )
     flow_map: bool = pfield(
         False, tier=Tier.POST, ui="Export",
@@ -2083,7 +2329,10 @@ class PlanetParams(_Params):
     )
     name: str = pfield(
         "unnamed", tier=Tier.POST, ui="Global",
-        description="Display/preset name",
+        description="Display name for this planet. Written into the export "
+                    "manifest, where the Blender importer uses it to name "
+                    "the object, rig and material. Saving a preset takes its "
+                    "name from the FILENAME, not from this",
     )
     sim: SimParams = Field(default_factory=SimParams)
     solver: SolverParams = Field(default_factory=SolverParams)
