@@ -190,7 +190,57 @@ chunks) and export (large chunks) develop identically.
   mechanical — see `docs/roadmap.md`); the coupling engine remains. The
   facade path above is what the GUI/CLI use;
   `engine/baroclinic_coupling.py::run_coupled` is the instrumented
-  measurement harness (per-phase wall time, residency recommendation).
+  measurement harness (per-phase wall time, residency recommendation). It does
+  NOT degrade — an outcrop there raises `BaroclinicOutcropError` out of
+  `driver.advance`, deliberately, so a measurement never silently reports a
+  frozen source as a live one.
+
+**The source is a decaying seed, not a grown wave.** Eddy interface variance
+decays monotonically at every configuration tried, so what reaches the Poisson
+RHS is the initial seeding pattern from `shallow_water_ref.baroclinic_test_state`.
+Four attempts to make the physical mode grow are closed by measurement — the
+`gp2` 0.3 revert, raising `xi`, refining the source grid, and a polar zonal
+filter to make that affordable. `docs/roadmap.md` carries the verdicts; read them
+before proposing a fifth. This is why the injected pattern reads as a mechanical
+comb: it plants ONE zonal mode at ONE global phase, broadcast to every latitude
+row. `resample_to_equirect`'s unit-std normalisation is what hides the amplitude
+collapse from every consumer.
+
+Seven RESTART-tier levers shape the band (`ui="Storm band"`), all no-op by
+default so the whole group is byte-identical until an artist moves one:
+
+- `phase_jitter` staggers the seeded phase per latitude row (breaks the crest
+  ALIGNMENT); `spectrum_width` seeds `m ± K` instead of a single mode (breaks the
+  wavelength MONOTONY). They are orthogonal — each moves its own metric and
+  leaves the other's alone — and each draws from its own `subseed` substream so
+  the broadband seed noise stays bitwise fixed. Neither makes the output
+  physically correct; they make the seed irregular rather than regular.
+- `latitude` / `width` / `eddy_scale` / `zonal_count` / `smooth` were hardcoded
+  module constants. Two base-state construction limits bound them, both of which
+  used to present as the feature silently switching itself off: the interface
+  swing scales as `xi·H2/tan(latitude)`, so `_balanced_sheared_base` now **deepens
+  the upper layer** rather than clipping it (inert at the default band, which
+  clears the floor by only 184 m of 12,500), and a band reaching the equator is
+  **clamped** off f=0 by `params.model.baroclinic_effective_width`, reported
+  through `validation_warnings`. The clamp rule lives in the params layer because
+  `validation_warnings` needs it and params may not import `sim`.
+- The coherence gate follows the band. `dominant_zonal_m`'s default row window
+  samples latitudes 53.4–15.9°, which was correct while the band was hardcoded at
+  45 ± 25 and is wrong the moment `latitude` is steerable — a band at 75 ± 8 spans
+  67–83° and lies *entirely* outside it, so the gate graded empty rows and
+  reported a meaningless m=1. `assert_coherent(..., in_band=True)` selects rows by
+  amplitude instead; the driver uses it, and the verdict is unchanged on the
+  default band.
+- `latitude` is bounded at 20° on the equatorward side, measured *through the
+  band-aware gate*: the seeded mode must still dominate, and the worst-width share
+  of zonal power at m=14 runs 0.94 at 75° / 0.81 at 45° / 0.48 at 20°, collapsing
+  only at 15° (clamped width 10 reads m=2 at 0.045). The gate alone cannot catch
+  that — it rejects grid-scale sources and a washed-out band is large-scale — so
+  the bound carries it. Measured with the FIXED window instead, 20° and 25° look
+  broken and are not; that error nearly cost a third of the usable range.
+- The facade driver cache keys on every one of them plus the equator-clamped
+  width, and remembers a key that FAILED warmup so a known-doomed multi-minute
+  computation is not re-run on each later rebuild.
 
 ## Invalidation tiers
 

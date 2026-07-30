@@ -55,12 +55,18 @@ def _stub_sim(params: PlanetParams) -> Simulation:
     sim._baro_driver = None
     sim._baro_key = None
     sim._baro_degraded_reason = None
+    sim._baro_failed_key = None
+    sim._baro_failed_reason = None
     return sim
 
 
 class _StubDriver:
-    def __init__(self, grid_w: int, grid_h: int, warmup_steps: int, seed: int) -> None:
-        pass
+    def __init__(self, grid_w: int, grid_h: int, warmup_steps: int, seed: int,
+                 **levers) -> None:
+        # **levers absorbs the storm-band fields (latitude/width/eddy_scale/
+        # zonal_count/smooth/phase_jitter/spectrum_width) so this stub does not
+        # have to be re-edited every time one is added.
+        self.levers = levers
 
     def reset(self) -> None:
         pass
@@ -195,3 +201,120 @@ def test_mid_run_success_keeps_active_status():
     sim._update_baroclinic_source()
     assert sim.baroclinic_status == "active"
     assert sim.baroclinic_degraded_reason is None
+
+
+# -- the driver cache key -----------------------------------------------------
+#
+# Every storm-band lever changes the WARM STATE, so each must take part in the
+# cache key. A lever missing from it is a lever the artist can move while the
+# facade hands back the driver warmed at the OLD value -- the slider appears
+# dead, and only on a full app restart does the change take effect.
+#
+# These reuse ONE Simulation and re-enter _init_baroclinic, which is the only
+# arrangement that can detect the bug: a fresh Simulation per case always starts
+# with _baro_driver = None and therefore always MISSES the cache, so it would
+# pass whether or not the key is correct.
+
+
+class _CountingDriver(_StubDriver):
+    built: list[dict] = []
+
+    def __init__(self, **kw) -> None:
+        super().__init__(**kw)
+        _CountingDriver.built.append(kw)
+
+
+#: (params field, driver kwarg, test value). Three of the seven are renamed on
+#: the way down -- the artist-facing name is plain English, the driver keeps the
+#: physics name -- so the mapping is asserted rather than assumed.
+_LEVERS = [
+    ("latitude", "latitude", 30.0),
+    ("width", "width", 18.0),
+    ("eddy_scale", "gp2", 0.09),
+    ("zonal_count", "m_zonal", 10),
+    ("smooth", "smooth_sigma", 2.5),
+    ("phase_jitter", "phase_jitter", 2.0),
+    ("spectrum_width", "spectrum_width", 4),
+]
+
+
+@pytest.mark.parametrize("field,kwarg,value", _LEVERS)
+def test_every_storm_band_lever_invalidates_the_cached_driver(
+        monkeypatch, field, kwarg, value):
+    monkeypatch.setattr(bdrv, "BaroclinicSourceDriver", _CountingDriver)
+    _CountingDriver.built = []
+    sim = _stub_sim(_params(enabled=True))
+
+    sim._init_baroclinic()
+    assert len(_CountingDriver.built) == 1, "first call must build"
+
+    sim._init_baroclinic()
+    assert len(_CountingDriver.built) == 1, "an unchanged config must reuse"
+
+    setattr(sim.params.solver.baroclinic, field, value)
+    sim._init_baroclinic()
+    assert len(_CountingDriver.built) == 2, f"{field} must invalidate the cache"
+    assert _CountingDriver.built[-1][kwarg] == value, f"{field} must reach the driver"
+
+
+def test_lever_list_covers_every_storm_band_field():
+    """Guards the guard: a new lever added to the params model without a row in
+    ``_LEVERS`` would leave the cache-key test silently not covering it."""
+    from gasgiant.params.model import BaroclinicParams
+    covered = {f for f, _, _ in _LEVERS}
+    cadence = {"enabled", "gain", "warmup_steps",
+               "baro_steps_per_update", "update_every"}
+    assert set(BaroclinicParams.model_fields) - cadence == covered
+
+
+def test_a_failed_warmup_is_not_retried(monkeypatch):
+    """A configuration that died in warmup must stay degraded, including across
+    the disable/re-enable cycle an artist performs after seeing the failure.
+
+    Re-running a warmup already known to die costs up to 20000 CPU steps (~2 min)
+    and produces the same failure every time. The memo lives on its OWN key
+    precisely because `_baro_key` is nulled by both the disable path and the
+    mid-run degrade.
+    """
+    calls = []
+
+    def boom(**kwargs):
+        calls.append(kwargs)
+        raise bdrv.BaroclinicWarmupError("warmup outcropped (injected)")
+
+    monkeypatch.setattr(bdrv, "BaroclinicSourceDriver", boom)
+    sim = _stub_sim(_params(enabled=True))
+
+    sim._init_baroclinic()
+    assert len(calls) == 1 and sim.baroclinic_status == "degraded"
+
+    sim._init_baroclinic()
+    assert len(calls) == 1, "an unchanged failing config must not be retried"
+    assert sim.baroclinic_status == "degraded"
+    assert "outcropped" in sim.baroclinic_degraded_reason
+
+    # Disable then re-enable at the same settings: still must not retry.
+    sim.params.solver.baroclinic.enabled = False
+    sim._init_baroclinic()
+    assert sim.baroclinic_status == "off"
+    sim.params.solver.baroclinic.enabled = True
+    sim._init_baroclinic()
+    assert len(calls) == 1, "re-enabling the same failing config must not retry"
+
+    # A DIFFERENT config is a different question and must be tried.
+    sim.params.solver.baroclinic.latitude = 60.0
+    sim._init_baroclinic()
+    assert len(calls) == 2
+
+
+def test_a_successful_build_clears_the_failure_memo(monkeypatch):
+    """Otherwise the memo outlives the failure and a later degrade could report a
+    reason from an unrelated earlier one."""
+    monkeypatch.setattr(bdrv, "BaroclinicSourceDriver", _StubDriver)
+    sim = _stub_sim(_params(enabled=True))
+    sim._baro_failed_key = ("stale",)
+    sim._baro_failed_reason = "stale reason"
+    sim._init_baroclinic()
+    assert sim.baroclinic_status == "active"
+    assert sim._baro_failed_key is None
+    assert sim._baro_failed_reason is None

@@ -1674,6 +1674,57 @@ INJECT_MASK_CODE: dict[InjectMask, int] = {
 }
 
 
+#: The baroclinic storm band must not reach the equator. The source is a
+#: GEOSTROPHIC proxy, zeta = (gp2/f) * lap(h2e), and the base state's interface
+#: swing scales as xi*H2/tan(latitude) -- both diverge as f -> 0, so a band
+#: straddling the equator clips the LOWER layer at build and outcrops in warmup.
+#: Measured region (2000-step warmup): every (latitude, width) fails once width
+#: reaches latitude, and every width <= latitude - 5 is clean across 10..75.
+#:
+#: This lives in the params layer because ``validation_warnings`` needs it and
+#: params may not import ``sim``; ``sim.baroclinic_driver`` imports it from here
+#: (and is the ONLY consumer) so there is exactly one implementation of the rule.
+BAROCLINIC_EQUATOR_GUARD_DEG = 5.0
+
+#: Narrowest storm band the fixed 192x96 source grid can actually represent, and
+#: therefore the floor on both the ``width`` slider and the equator clamp above.
+#: ``_balanced_sheared_base`` uses ``sigma_phi = 0.5 * width``, so width 8 is a
+#: 4-degree Gaussian against dphi = 1.875 -- about 2.1 cells. Below that the
+#: trapezoidal interface integral stops realizing the requested band-centre shear
+#: and the seeded envelope is a few pixels tall, so the slider would be promising
+#: a range it cannot deliver.
+#:
+#: ``latitude``'s own minimum of 20 comes from a stronger constraint, measured at
+#: the shipped 8000-step warmup through the driver's real source path with the
+#: BAND-AWARE gate: the seeded mode has to still DOMINATE. Share of zonal power at
+#: m=14, worst width at each centre -- 75deg 0.94, 45deg 0.81, 30deg 0.46,
+#: 25deg 0.77, 20deg 0.48; at 15deg the clamped width-10 band collapses to m=2 at
+#: 0.045. The coherence gate cannot catch that: it rejects GRID-SCALE sources and
+#: a washed-out band is large-scale, so the bound has to carry it.
+#:
+#: Measure this with ``dominant_zonal_m_in_band``. The fixed-window
+#: ``dominant_zonal_m`` samples latitudes 53.4..15.9 and mixes empty rows into a
+#: moved band, which condemns 20deg (reads a spurious m=43) and 25deg (reads
+#: 0.24) -- both are fine.
+BAROCLINIC_MIN_WIDTH_DEG = 8.0
+
+
+def baroclinic_effective_width(latitude: float, width: float) -> float:
+    """The storm-band half-width actually used, clamped off the equator.
+
+    Clamping rather than rejecting is the physically honest choice: "centre 10,
+    width 25" asks for a band from -15 to +35 degrees, and a geostrophic
+    baroclinic band cannot cross f = 0 at all. Every slider position stays
+    renderable, and ``validation_warnings`` tells the artist when the clamp bit.
+
+    Inert wherever the band already clears the equator, so the default
+    (45 +/- 25) is unchanged.
+    """
+    return min(float(width),
+               max(BAROCLINIC_MIN_WIDTH_DEG,
+                   float(latitude) - BAROCLINIC_EQUATOR_GUARD_DEG))
+
+
 class BaroclinicParams(_Params):
     """Opt-in 2-layer baroclinic vorticity source coupled into the vorticity
     solver's equirect pass (M3). OFF by default => byte-identical to plain v1.6.
@@ -1684,9 +1735,8 @@ class BaroclinicParams(_Params):
 
     enabled: bool = pfield(
         False, tier=Tier.RESTART, adv=True, ui="Solver",
-        description="Adds physically-grounded mid-latitude storms, grown by a "
-                    "baroclinic instability model, in addition to the "
-                    "hand-seeded ones. "
+        description="Adds a band of extra mid-latitude storms, shaped by a "
+                    "2-layer atmosphere model, on top of the hand-seeded ones. "
                     "Off = plain v1.6; requires solver type=vorticity (injects "
                     "the evolving baroclinic vorticity source into the solver). "
                     "No rand: randomize() must never silently enable it.")
@@ -1718,6 +1768,70 @@ class BaroclinicParams(_Params):
         description="Internal pacing of the baroclinic storm generator; leave "
                     "at default (main-solver steps between source refreshes; "
                     "fixed cadence, no rand)")
+
+    # -- Shape of the storm band (were hardcoded module constants) ------------
+    # Every default below reproduces the previous hardcoded value, so the whole
+    # group is byte-identical until an artist moves one.
+    latitude: float = pfield(
+        45.0, tier=Tier.RESTART, lo=20.0, hi=75.0, adv=True,
+        ui="Storm band", label="Band centre latitude",
+        description="Moves the whole belt of extra storms north or south. "
+                    "45 sits them in the mid-latitudes, like Jupiter's "
+                    "temperate belts; low values crowd them toward the "
+                    "equator (centre of the unstable shear zone, in degrees "
+                    "north; mirrored to the southern hemisphere by the "
+                    "source mask).")
+    width: float = pfield(
+        25.0, tier=Tier.RESTART, lo=8.0, hi=40.0, adv=True,
+        ui="Storm band", label="Band width",
+        description="How tall the belt of extra storms is. Higher spreads them "
+                    "over more latitudes; lower squeezes them into one narrow "
+                    "lane (half-width of the seeding envelope in degrees, so "
+                    "the belt spans latitude +/- this).")
+    eddy_scale: float = pfield(
+        0.075, tier=Tier.RESTART, lo=0.02, hi=0.15, log=True, adv=True,
+        ui="Storm band", label="Storm size",
+        description="Size of each storm in the belt. Higher makes fewer, "
+                    "broader storms; lower makes them smaller and more "
+                    "numerous. Raising it far past the default destabilizes "
+                    "the generator and the belt drops out (reduced gravity "
+                    "setting the deformation radius; the upper bound keeps it "
+                    "clear of the layer blow-up).")
+    zonal_count: int = pfield(
+        14, tier=Tier.RESTART, lo=4, hi=20, adv=True,
+        ui="Storm band", label="Storms around the planet",
+        description="How many storms are seeded around a full circle of "
+                    "longitude. Pair it with Storm size -- a count far from "
+                    "what that size supports just fades out (seeded zonal "
+                    "wavenumber; the coherence gate rejects anything above "
+                    "20).")
+    smooth: float = pfield(
+        1.26, tier=Tier.RESTART, lo=0.5, hi=6.0, adv=True,
+        ui="Storm band", label="Storm edge softness",
+        description="Softens the storms' fine structure. Higher gives smooth "
+                    "broad shapes; too low lets grid-scale speckle through and "
+                    "the belt drops out (Gaussian blur in source-grid pixels, "
+                    "applied before the source is resampled).")
+
+    # -- Break up the seeded pattern's regularity -----------------------------
+    # Both default to a no-op and both draw from their own named subseed stream,
+    # so the broadband seed noise stays bitwise fixed and each is an isolated axis.
+    phase_jitter: float = pfield(
+        0.0, tier=Tier.RESTART, lo=0.0, hi=2.5, adv=True,
+        ui="Storm band", label="Stagger the storm band",
+        description="Breaks up the row of storms so their crests stop lining "
+                    "up in a vertical comb. Higher staggers them further, and "
+                    "2 is already fully staggered; 0 = off, every crest shares "
+                    "one phase (random per-latitude phase offset in radians "
+                    "applied to the seeded pattern; 1 rad = 57.3 deg).")
+    spectrum_width: int = pfield(
+        0, tier=Tier.RESTART, lo=0, hi=6, adv=True,
+        ui="Storm band", label="Vary the storm spacing",
+        description="Varies the gaps between storms so they stop repeating at "
+                    "one fixed spacing. Higher mixes in a wider range of "
+                    "sizes; 0 = off, every storm identically spaced. 4 is a "
+                    "good starting point (seeds neighbouring zonal "
+                    "wavenumbers either side of Storms around the planet).")
 
 
 # Practical floor for a screened-Poisson deformation radius: below ~a few grid
@@ -2370,6 +2484,21 @@ class PlanetParams(_Params):
         deliberately NOT enumerated here -- read them; the list went stale twice
         as cast levers grew."""
         warnings: list[str] = []
+        # A storm band reaching the equator is clamped rather than rejected: a
+        # geostrophic baroclinic band cannot cross f = 0, and both the source
+        # proxy (gp2/f) and the base-state interface swing (~cot latitude)
+        # diverge there. Clamping keeps every slider position renderable, but it
+        # means the artist asked for a wider belt than they got, so say so.
+        bp = self.solver.baroclinic
+        if bp.enabled:
+            eff = baroclinic_effective_width(bp.latitude, bp.width)
+            if eff < bp.width:
+                warnings.append(
+                    f"solver.baroclinic.width={bp.width:g} would put the storm "
+                    f"band across the equator at latitude={bp.latitude:g}; it is "
+                    f"clamped to {eff:g} (a geostrophic band cannot cross f=0). "
+                    f"Move latitude poleward to use the full width."
+                )
         if self.solver.type == SolverType.KINEMATIC:
             for field_name in ("hero_solid_core", "oval_solid_core"):
                 value = getattr(self.storms, field_name)

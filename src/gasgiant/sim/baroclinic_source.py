@@ -31,6 +31,34 @@ GP1, GP2, XI = 0.05, 0.075, 3.0
 # does not blur the eddies away. Both consumed by baroclinic_driver.
 M_ZONAL = 14
 SMOOTH_SIGMA = 1.26
+# Band the seeding envelope occupies, and the default mask that follows it. The
+# mask must TRACK the band: it is applied to |latitude|, so it also mirrors the
+# northern-hemisphere seeding into the south.
+PHI_TEST_DEG, BAND_HALFWIDTH_DEG = 45.0, 25.0
+
+
+#: Padding between the seeded envelope and the mask that passes it, in degrees.
+#: This is NOT the taper (8.0): it is sized so the default 45 +/- 25 band
+#: reproduces the historical hardcoded mask exactly, and the two numbers being
+#: close is a coincidence worth not collapsing. Using the taper here silently
+#: moved the default source (max |diff| 0.885 on a unit-std source).
+MASK_PAD_DEG = 10.0
+
+
+def mask_band_for(latitude: float, width: float,
+                  taper: float = 8.0) -> tuple[tuple[float, float], float]:
+    """`(lat_band, taper)` for `geostrophic_vorticity_source`, given the seeding
+    band's centre and half-width in degrees.
+
+    The mask must stay WIDER than the seeded envelope or it clips the storms it
+    is meant to pass; it is padded by MASK_PAD_DEG on each side and clamped to a
+    latitude range that keeps the 1/cos^2 zonal Laplacian away from the poles.
+    Returns exactly the historical (10.0, 80.0) at the default 45 +/- 25 band, so
+    the default source is unchanged -- pinned by test_mask_band_default.
+    """
+    lo = max(1.0, latitude - width - MASK_PAD_DEG)
+    hi = min(88.0, latitude + width + MASK_PAD_DEG)
+    return (lo, hi), taper
 
 # Coherence gate: a usable source's dominant zonal wavenumber must be low (reject
 # the C-grid checkerboard, m~44-51). Raised 15->20 to give the m~14 production
@@ -41,7 +69,12 @@ M_GATE_MAX = 20
 def dominant_zonal_m(field2d: np.ndarray,
                      row_frac: tuple[float, float] = (0.20, 0.42)) -> tuple[int, np.ndarray]:
     """Dominant zonal wavenumber of a (H, W) field: FFT a band of mid-latitude
-    rows, average the power spectra, return argmax m (excluding DC) + spectrum."""
+    rows, average the power spectra, return argmax m (excluding DC) + spectrum.
+
+    The default ``row_frac`` samples latitudes 53.4..15.9 deg -- a window sized
+    for the ORIGINAL fixed 45 +/- 25 band. It does not follow a moved band; use
+    ``dominant_zonal_m_in_band`` for anything the artist can steer.
+    """
     H, _ = field2d.shape
     r0, r1 = int(row_frac[0] * H), int(row_frac[1] * H)
     rows = field2d[r0:r1]
@@ -49,6 +82,31 @@ def dominant_zonal_m(field2d: np.ndarray,
     spec = (np.abs(np.fft.rfft(rows, axis=1)) ** 2).mean(axis=0)
     m = int(np.argmax(spec[1:]) + 1)
     return m, spec
+
+
+def dominant_zonal_m_in_band(field2d: np.ndarray,
+                             amp_frac: float = 0.15) -> tuple[int, np.ndarray]:
+    """Same, but over the rows actually CARRYING the band.
+
+    Rows are chosen by amplitude rather than by a fixed latitude window, so the
+    measurement follows the band wherever `latitude`/`width` put it. With the
+    fixed window, a band centred at 75 deg with half-width 8 (67..83) lies
+    entirely OUTSIDE the sampled rows: the gate then reads empty rows and reports
+    a meaningless m=1, and a band that only partly overlaps mixes in empty rows
+    whose noise can dominate the argmax. Both were reachable from the shipped
+    slider ranges.
+
+    Falls back to the whole field if nothing clears the threshold, so this can
+    never select an empty set.
+    """
+    amp = np.abs(field2d).sum(axis=1)
+    peak = float(amp.max())
+    rows = field2d[amp > amp_frac * peak] if peak > 0 else field2d
+    if rows.shape[0] == 0:
+        rows = field2d
+    rows = rows - rows.mean(axis=1, keepdims=True)
+    spec = (np.abs(np.fft.rfft(rows, axis=1)) ** 2).mean(axis=0)
+    return int(np.argmax(spec[1:]) + 1), spec
 
 
 def _gaussian_kernel1d(sigma: float) -> np.ndarray:
@@ -119,9 +177,17 @@ class IncoherentSourceError(ValueError):
     distinctly from an unrelated ValueError raised by a genuine bug."""
 
 
-def assert_coherent(field2d: np.ndarray) -> int:
-    """Reject a checkerboard source. Returns the dominant zonal m (<= M_GATE_MAX)."""
-    m, _ = dominant_zonal_m(field2d)
+def assert_coherent(field2d: np.ndarray, in_band: bool = False) -> int:
+    """Reject a checkerboard source. Returns the dominant zonal m (<= M_GATE_MAX).
+
+    ``in_band=True`` measures over the rows carrying the band instead of the fixed
+    mid-latitude window -- required once `latitude`/`width` are artist-steerable,
+    because the fixed window does not follow the band and will happily gate on
+    empty rows. Default stays the fixed window so existing callers and the pinned
+    source tests are unchanged.
+    """
+    m, _ = (dominant_zonal_m_in_band(field2d) if in_band
+            else dominant_zonal_m(field2d))
     if m > M_GATE_MAX:
         raise IncoherentSourceError(
             f"source dominant zonal m={m} exceeds coherence gate {M_GATE_MAX} "

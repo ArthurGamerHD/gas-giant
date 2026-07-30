@@ -28,6 +28,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from gasgiant.params.seeds import subseed
+
 # ---------------------------------------------------------------------------
 # Grid
 # ---------------------------------------------------------------------------
@@ -687,6 +689,49 @@ _PHI_TEST_DEG = 45.0
 _BAND_HALFWIDTH_DEG = 25.0   # envelope -> 0 at phi_test +/- 25deg (i.e. 20..70deg)
 
 
+def _seed_pattern(lam, H, W, m_zonal, phase, jitter, k_width, seed):
+    """Longitudinal seeding pattern for the interface perturbation.
+
+    The default (jitter 0, k_width 0) is a single zonal mode at one phase for the
+    whole globe -- which is what makes the injected source read as a mechanical
+    comb: every crest the same width, the same distance apart, and aligned
+    pole-to-pole. This is NOT reached on the default path (the caller keeps its
+    original expression byte-for-byte); it exists only when a lever is on.
+
+    `jitter` staggers the phase per latitude row, so crests stop sharing one
+    vertical line. `k_width` seeds neighbouring wavenumbers m +/- k with
+    independent phases, so the spacing stops repeating. They are ORTHOGONAL --
+    each moves its own defect and leaves the other's metric alone (measured; see
+    docs/superpowers/specs/2026-07-30-baroclinic-artist-levers-design.md).
+
+    Each draws from its OWN named substream, so the broadband `noise` field the
+    caller draws from `rng` stays bitwise fixed and neither lever perturbs the
+    other's realization.
+    """
+    off = 0.0
+    if jitter != 0.0:
+        off = jitter * subseed(seed, "baroclinic_phase_jitter").standard_normal((H, 1))
+    if k_width <= 0:
+        return np.cos(m_zonal * lam[None, :] + phase + off)
+
+    ms = np.arange(m_zonal - k_width, m_zonal + k_width + 1)
+    ms = ms[ms >= 1]
+    # Gaussian taper so the seeded band falls off either side of m_zonal rather
+    # than being a top-hat of equally-weighted modes.
+    amp = np.exp(-0.5 * ((ms - m_zonal) / max(k_width * 0.6, 0.5)) ** 2)
+    ph = subseed(seed, "baroclinic_spectrum").uniform(0.0, 2.0 * np.pi, ms.size)
+    acc = np.zeros((H, W))
+    for i, m in enumerate(ms):
+        acc = acc + amp[i] * np.cos(m * lam[None, :] + phase + ph[i] + off)
+    # Renormalize to the SINGLE-MODE variance so `pert_amp_frac` keeps meaning
+    # the same injected amplitude regardless of how many modes are seeded.
+    # Independent phases => var(acc) = sum(amp^2)/2, and a lone cos has var 1/2,
+    # so the divisor is sqrt(sum(amp^2)). Dividing by sqrt(0.5*sum(amp^2))
+    # instead normalizes to UNIT variance and quietly makes this a 1.41x
+    # amplitude lever as well as a spacing one.
+    return acc / np.sqrt(float((amp ** 2).sum()))
+
+
 def _band_envelope(phi: np.ndarray, phi0: float, halfwidth: float) -> np.ndarray:
     """Smooth cos^2 bell, 1 at phi0, 0 at phi0 +/- halfwidth (radians); 0 outside."""
     x = (phi - phi0) / halfwidth
@@ -741,6 +786,25 @@ def _balanced_sheared_base(
     dphi_arr = np.diff(phi)
     cumint = np.concatenate([[0.0], np.cumsum(0.5 * (bump[:-1] + bump[1:]) * dphi_arr)])
     cumint = cumint - float((g.cos_c * cumint).sum() / g.cos_c.sum())
+
+    # The UPPER layer is what this construction can drive negative: h1 = H1_mean
+    # - A*cumint, and A = xi*H2_mean/tan(phi_test), which diverges as the band
+    # moves equatorward -- the swing nearly doubles between 45 and 28 degrees,
+    # and grows linearly with xi besides. Clipping h1 at the floor silently
+    # breaks the geostrophic balance this base state exists to satisfy, and the
+    # run then outcrops during warmup: the band latitude looks like a slider that
+    # switches the feature off below ~35 degrees.
+    #
+    # Deepen the upper layer rather than clip it, and ONLY when it would
+    # otherwise clip. At the default construction h1 clears the floor by 184 m,
+    # so this is inert there and the default state stays bitwise unchanged.
+    # (A * cumint).max(), NOT A * cumint.max(): A = shear*a*f_test/gp2 flips
+    # sign for a SOUTHERN band (f_test < 0 while shear stays positive), and h1
+    # is then minimised at cumint.min(). Taking the max of the product is
+    # sign-safe and identical on the northern path.
+    swing = float((A * cumint).max())
+    H1_mean = max(H1_mean, swing + 0.01 * H2_mean)
+
     h2_prof = H2_mean + A * cumint
     # Flat top free surface: eta1 = H1_mean + H2_mean (const) => h1 = eta1 - h2.
     h1_prof = (H1_mean + H2_mean) - h2_prof
@@ -760,6 +824,8 @@ def baroclinic_test_state(
     H1_mean=12500.0, H2_mean=12500.0,
     m_zonal=5, pert_amp_frac=1e-3, dt_safety=0.3, h_floor=1.0,
     nu4=0.0, xi_unstable=2.0, xi_stable=0.5,
+    phi_test_deg=None, band_halfwidth_deg=None,
+    phase_jitter=0.0, spectrum_width=0,
 ):
     """Balanced 2-layer base with a mid-latitude eastward shear + balanced
     interface perturbation at the f-plane Phillips K_max (M3 Task 6 Step 2).
@@ -779,14 +845,17 @@ def baroclinic_test_state(
     v' = (gp2/f0)(1/(a cos)) dh2'/dlambda) so it does NOT radiate gravity waves
     (the M2-adv lesson).
 
-    H = H1_mean + H2_mean is the total layer-mean depth used in L_D.
+    The total layer-mean depth used in L_D is read back off the BUILT state
+    (`Htot` below), NOT computed as H1_mean + H2_mean: _balanced_sheared_base
+    deepens the upper layer when the interface swing would otherwise clip it,
+    so those are not equal away from the default band (at latitude=45 width=40
+    the realized depth is 32160, not 25000).
     """
-    phi_test = np.radians(_PHI_TEST_DEG)
-    band_hw = np.radians(_BAND_HALFWIDTH_DEG)
+    phi_test = np.radians(_PHI_TEST_DEG if phi_test_deg is None else phi_test_deg)
+    band_hw = np.radians(
+        _BAND_HALFWIDTH_DEG if band_halfwidth_deg is None else band_halfwidth_deg)
     f0 = 2.0 * omega * np.sin(phi_test)
     beta = 2.0 * omega * np.cos(phi_test) / a
-    Htot = H1_mean + H2_mean
-
     # Critical shear & the requested supercriticality.
     U_crit = beta * gp2 * H2_mean / (f0 * f0)
     xi = xi_unstable if unstable else xi_stable
@@ -811,6 +880,13 @@ def baroclinic_test_state(
     h2_mean_local = float(h2.mean())
     A = pert_amp_frac * h2_mean_local
     cos_lam = np.cos(m_zonal * lam + phase)[None, :] * np.ones((H, 1))
+    # Structural guard, not a branch inside the expression: with both levers off
+    # the line above is the ONLY thing that runs and its float shape is untouched,
+    # so the default path stays bitwise identical (an algebraically equivalent
+    # rewrite would not be -- float addition is not associative).
+    if phase_jitter != 0.0 or spectrum_width > 0:
+        cos_lam = _seed_pattern(lam, H, W, m_zonal, phase,
+                                phase_jitter, spectrum_width, seed)
     noise = rng.standard_normal((H, W))
     noise = noise - noise.mean(axis=1, keepdims=True)   # zero zonal mean (eddy only)
     h2_pert = env * (A * cos_lam + 0.5 * A * noise)     # (H, W)
@@ -838,6 +914,15 @@ def baroclinic_test_state(
 
     h1 = np.maximum(h1, h_floor)
     h2 = np.maximum(h2, h_floor)
+
+    # Read the total depth back off the BUILT state rather than trusting the
+    # requested means: _balanced_sheared_base deepens the upper layer when the
+    # interface swing would otherwise clip it, so H1_mean + H2_mean is not the
+    # realized depth away from the default band. L_D and the growth-rate
+    # diagnostics below read this, and would otherwise be silently wrong exactly
+    # where the construction had to intervene. Equal to H1_mean + H2_mean
+    # whenever no deepening happened, so the default path is unchanged.
+    Htot = float((h1 + h2).mean())
 
     # dt: production a-aware polar CFL with the barotropic external-mode speed.
     c_gw = np.sqrt(gp1 * (h1 + h2).max())
