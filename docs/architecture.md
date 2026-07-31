@@ -241,14 +241,14 @@ default so the whole group is byte-identical until an artist moves one:
 - The facade driver cache keys on the levers that shape the WARM STATE plus the
   equator-clamped width, and remembers a key that FAILED warmup so a
   known-doomed multi-minute computation is not re-run on each later rebuild.
-  Warming is the expensive half: measured 8.65 ms/step on the fixed 192×96
-  source grid, so ~69 s at the default `warmup_steps` 8000 and ~173 s at the
-  20000 ceiling, all of it synchronous on the caller's thread.
+  Warming is the expensive half: measured 52 s end to end at the default
+  `warmup_steps` 8000 on the fixed 192×96 source grid (~6.5 ms/step; ~130 s at
+  the 20000 ceiling), all of it synchronous on the caller's thread.
 - **What is NOT in that key.** `smooth` and the output grid are consumed when a
   source is *derived* off the warm state, never during the warmup — the solver
   runs at 192×96 regardless of the export resolution and never sees the sigma.
   Both are measured bit-identical across the warm state (output grids 512 vs
-  2048; sigma 1.26 vs 4.0), so keying on them bought a ~69 s re-warmup to
+  2048; sigma 1.26 vs 4.0), so keying on them bought a ~52 s re-warmup to
   rebuild an identical array, on the single most common RESTART edit in the app
   (preview at 2048, render at 4096). They are arguments to
   `BaroclinicSourceDriver.current_source` rather than constructor state, which
@@ -260,6 +260,60 @@ default so the whole group is byte-identical until an artist moves one:
   `tests/unit/test_facade_baroclinic_status.py`, which pins both directions —
   warm-state levers invalidate, derivation levers do not, and a reused driver
   still derives at the current grid and sigma.
+- **The warm state also persists to disk** (`sim/baroclinic_cache.py`,
+  `~/.gasgiant/baro_cache`, ~768 KiB per entry, 64 MiB cap with oldest-first
+  eviction). The in-memory facade cache only survives while a `Simulation`
+  does; the disk cache makes a configuration cost its 52 s exactly once, ever.
+  Measured 52.1 s cold vs 0.017 s warm. It is opt-in at the driver
+  (`cache_dir=None` by default) so a test that means to exercise a real warmup
+  gets one, and an autouse `conftest` fixture redirects it per-test — a hit
+  would otherwise let a warmup regression pass on a developer machine that had
+  run the suite before and fail on a clean checkout.
+- **The disk cache is only as good as its key**, and the failure is asymmetric:
+  a miss costs a re-warmup, a false hit silently serves a state warmed under
+  different physics. So it is deliberately over-broad. It fingerprints the full
+  source text of the five modules in `_FINGERPRINTED`: the solver
+  (`shallow_water_ref.py`), its constants (`baroclinic_source.py`), the driver
+  (which owns the literals `pert_amp_frac`, `dt_safety`, `nu4` passed into the
+  state builder — values no caller supplies and no other file records), the
+  cache module itself (it owns `EVOLVING_FIELDS`, i.e. which arrays a restore
+  puts back at all), and `params/seeds.py` (whose `subseed` draws the
+  `phase_jitter`/`spectrum_width` seeding realization, which lands in h2/u2/v2
+  at t=0). Editing any of the five invalidates everything, which is the right
+  trade: a spurious re-warmup while you are editing the solver is exactly when
+  you want one. The key also carries the *runtime* values of the
+  `baroclinic_source` constants (`GP1`, `XI`, `SRC_W`, `SRC_H`), because the
+  tests monkeypatch them and a text-only fingerprint cannot see that.
+- **That list is curated, not derived** — nothing walks the import graph, so a
+  new first-party dependency of the warm state has to be added by hand.
+  Over-inclusion is free; under-inclusion is a false hit, so err toward adding.
+  `params/seeds.py` was missing from the original list and found in review. Two
+  consequences worth knowing: shipping a prebuilt warm state in the package is
+  not viable while the fingerprint works this way (any edit to those five files
+  silently retires it), and the disk key is guarded against constructor drift
+  by `test_disk_cache_key_covers_every_warm_state_constructor_input`, which
+  compares `inspect.signature(BaroclinicSourceDriver.__init__)` against the
+  kwargs the driver actually passes — the fingerprint cannot cover this, since
+  it is a per-build constant and cannot separate two *values* of a new lever.
+- **Every cache failure degrades to a re-warmup, never to an exception.** This
+  is a hard rule rather than defensive habit: the driver does not wrap the
+  cache, and `facade._init_baroclinic` catches only `ImportError` and
+  `BaroclinicWarmupError`, so anything else escapes `Simulation.__init__` and,
+  from the GUI, throws through the imgui frame callback on a RESTART-tier edit.
+  A locked cache file must cost 52 s, not the application. The paths that need
+  it are less exotic than they sound — on Windows an AV scan or a sync agent
+  touching `~/.gasgiant` can make a *valid* entry fail both `np.load` and the
+  unlink that recovers from it. Covered: an unreadable entry, an undeletable
+  one, a write that fails for a non-`OSError` reason (the zip layer raises
+  `LargeZipFile`/`ValueError`; a compress under pressure raises `MemoryError`),
+  an unreadable *source* file during fingerprinting (which returns `None` and
+  disables the cache — without trustworthy source identity a hit could be
+  foreign physics; only a success is memoized, so a transient lock costs one
+  uncached construction), and an undeletable stale temp, which is guarded
+  because an abort there would skip the eviction loop and silently switch the
+  64 MiB cap off. The temp sweep also ignores files younger than an hour: a
+  fresh `.tmp` may be a concurrent process's in-flight write, and sweeping it
+  turns that process's `replace` into a `FileNotFoundError`.
 
 ## Invalidation tiers
 

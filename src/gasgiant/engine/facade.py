@@ -224,8 +224,9 @@ class Simulation:
         self.release()
 
     def _init_baroclinic(self) -> None:
-        """Build/reuse the baroclinic source driver when enabled. Caches on the
-        grid plus EVERY input the warm state depends on (see `key` below) so
+        """Build/reuse the baroclinic source driver when enabled. Caches on
+        EVERY input the warm state depends on and nothing else (see `key`
+        below -- notably NOT the grid, which only the derivation uses) so
         unrelated RESTART edits don't re-warm, and remembers a key that FAILED
         warmup so a known-doomed multi-minute computation is not re-run on every
         later rebuild. On the
@@ -267,15 +268,16 @@ class Simulation:
         # EVERY input the warm state depends on belongs here, and NOTHING else.
         # A lever missing from this key is a lever the artist can move while the
         # facade silently hands back the driver warmed at the OLD value. A lever
-        # wrongly PRESENT costs a ~69 s re-warmup to rebuild a bit-identical
+        # wrongly PRESENT costs a ~52 s re-warmup to rebuild a bit-identical
         # state -- which is why the equirect size and `smooth` are absent: both
         # are consumed at derivation time (see BaroclinicSourceDriver's class
         # docstring), and the warmup runs on the fixed 192x96 source grid
         # regardless of either. Both are passed fresh to `current_source`.
         # `width` enters as the EQUATOR-CLAMPED value the driver actually warms
-        # on, not the raw slider: at latitude=12 every width >= 7 clamps to 7, and
-        # keying on the raw number would pay a full re-warmup to rebuild a
-        # bit-identical state. Inert wherever the clamp is (including the default).
+        # on, not the raw slider: at latitude=20 (the equatorward bound) every
+        # width >= 15 clamps to 15, so keying on the raw number would pay a full
+        # re-warmup to rebuild a bit-identical state. Inert wherever the clamp is
+        # not binding, including at the default band (45 +- 25).
         key = (bp.warmup_steps, self.params.seed,
                bp.latitude, baroclinic_effective_width(bp.latitude, bp.width),
                bp.eddy_scale, bp.zonal_count,
@@ -292,6 +294,7 @@ class Simulation:
             self._baro_degraded_reason = self._baro_failed_reason
             return
         try:
+            from gasgiant.sim import baroclinic_cache as bcache
             from gasgiant.sim.baroclinic_driver import (
                 BaroclinicSourceDriver,
                 BaroclinicWarmupError,
@@ -302,7 +305,12 @@ class Simulation:
                 m_zonal=bp.zonal_count, gp2=bp.eddy_scale,
                 latitude=bp.latitude, width=bp.width,
                 phase_jitter=bp.phase_jitter,
-                spectrum_width=bp.spectrum_width)
+                spectrum_width=bp.spectrum_width,
+                # Read as a module ATTRIBUTE at call time, never captured into a
+                # default argument -- the same binds-once trap the driver's own
+                # sentinel defaults document. Lets conftest redirect the whole
+                # suite away from the user's real ~/.gasgiant cache.
+                cache_dir=bcache.BARO_CACHE_DIR)
             self._baro_key = key
             self._baro_failed_key = None
             self._baro_failed_reason = None
