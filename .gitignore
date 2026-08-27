@@ -32,3 +32,6 @@ desktop.ini
 
 tests/blender/result.json
 dist/
+/.idea
+*/obj
+*/bin

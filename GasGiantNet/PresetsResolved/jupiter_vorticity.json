@@ -1,0 +1,917 @@
+{
+  "seed": 4201,
+  "name": "jupiter_vorticity",
+  "sim": {
+    "resolution": 4096,
+    "dev_steps": 700,
+    "dt_scale": 1.0,
+    "resolution_invariant": false,
+    "reference_resolution": 2048
+  },
+  "solver": {
+    "type": "vorticity",
+    "poisson_iters": 48,
+    "sor_omega": 1.7,
+    "deformation_radius": 0.18,
+    "vort_relax_tau": 600.0,
+    "vort_hypervisc": 0.6,
+    "coriolis_f0": 3.0,
+    "vort_inject": 1.8,
+    "vort_inject_scale": 2.5,
+    "vort_inject_mask": "shear",
+    "vort_drag": 0.0,
+    "vort_eddy_drag": 0.0,
+    "vort_psi_drag": 0.06,
+    "baroclinic": {
+      "enabled": false,
+      "gain": 2.0,
+      "warmup_steps": 8000,
+      "baro_steps_per_update": 150,
+      "update_every": 32,
+      "latitude": 45.0,
+      "width": 25.0,
+      "eddy_scale": 0.075,
+      "zonal_count": 14,
+      "smooth": 1.26,
+      "phase_jitter": 0.0,
+      "spectrum_width": 0
+    }
+  },
+  "bands": {
+    "count": 22,
+    "width_jitter": 0.4,
+    "edge_softness": 0.008,
+    "value_contrast": 1.7,
+    "warp_amount": 0.04,
+    "warp_freq": 3.5,
+    "detail_amount": 0.12,
+    "hue_jitter": 0.04,
+    "variance_amount": 0.18,
+    "faded_sector": 0.55,
+    "belt_fade": 0.0,
+    "faded_band_index": null,
+    "contrast_envelope": 0.6,
+    "lane_density": 0.0,
+    "edge_diversity": 0.55,
+    "width_tail": 0.35,
+    "detail_freq": 14.0,
+    "template": {
+      "edges_deg": [
+        90.0,
+        41.91,
+        24.75,
+        22.22,
+        18.0,
+        5.91,
+        -7.31,
+        -19.41,
+        -36.84,
+        -43.31,
+        -48.09,
+        -66.94,
+        -90.0
+      ],
+      "values": [
+        0.3221,
+        0.6226,
+        0.4942,
+        0.733,
+        0.3467,
+        0.78,
+        0.52,
+        0.738,
+        0.4865,
+        0.5971,
+        0.3,
+        0.56
+      ],
+      "heights": [
+        0.32,
+        0.6069,
+        0.4766,
+        0.7073,
+        0.3424,
+        0.75,
+        0.5,
+        0.7118,
+        0.4695,
+        0.5837,
+        0.3,
+        0.4
+      ]
+    }
+  },
+  "jets": {
+    "strength": 0.733,
+    "equatorial_speed": 1.693,
+    "equatorial_width": 0.194,
+    "polar_decay": 0.648,
+    "local_jet_speed": 0.0,
+    "local_jet_latitude": -20.0,
+    "local_jet_width": 0.05,
+    "hero_bracket_north": -3.0,
+    "hero_bracket_south": 3.0,
+    "hero_bracket_north_offset": 1.0,
+    "hero_bracket_south_offset": -1.0,
+    "hero_bracket_window": 1.0,
+    "hero_bracket_feather": 1.4,
+    "hero_bracket_north_width": 0.8,
+    "hero_bracket_south_width": 0.8
+  },
+  "turbulence": {
+    "intensity": 1.2,
+    "shear_coupling": 0.9,
+    "belt_boost": 1.3,
+    "scale": 6.0,
+    "evolution_rate": 0.012,
+    "relax_tau": 2000.0,
+    "replenish_rate": 0.45,
+    "kh_amplitude": 0.6,
+    "kh_wavenumber": 24,
+    "belt_replenish": 0.0,
+    "belt_replenish_scale": 2.0
+  },
+  "storms": {
+    "hero_count": 1,
+    "hero_radius": 0.16,
+    "hero_strength": 1.9,
+    "hero_latitude": -22.5,
+    "hero_longitude": null,
+    "rim_contrast": 2.0,
+    "hero_aspect": 2.2,
+    "hero_mottle": 0.7,
+    "hero_tint_var": 0.4,
+    "hero_rim_tint": 0.85,
+    "hero_rim_warp": 0.65,
+    "hero_wake_detail": 0.8,
+    "hero_wake_dir": "auto",
+    "hero_solid_core": 1.0,
+    "hero_emergence": 0.8,
+    "wake_turbulence": 1.593,
+    "hero_tint": 0.9,
+    "hero_brightness": 0.05,
+    "hero_companions": 0,
+    "companion_aspect": 1.0,
+    "companion_brightness": 0.32,
+    "hero_shape": 1.0,
+    "hero_shape_seed": 0,
+    "hero_taper": 0.0,
+    "hero_flow_aspect": 1.0,
+    "oval_density": 3.0,
+    "oval_solid_core": 0.0,
+    "accent_count": 0,
+    "accent_latitude": null,
+    "accent_longitude": null,
+    "accent_tint": 0.9,
+    "accent_brightness": 0.12,
+    "accent_radius": 0.05,
+    "accent_aspect": 1.0,
+    "barge_density": 2.989,
+    "pearls_count": 14,
+    "outbreak_count": 2,
+    "outbreak_strength": 1.1,
+    "outbreak_latitude": null,
+    "outbreak_longitude": null,
+    "outbreak_phase": null,
+    "outbreak_lat_min": 0.2,
+    "small_density": 3.0,
+    "stamp_contrast": 2.4,
+    "stamp_tint_contrast": null,
+    "merge_rate": 0.219,
+    "merge_debris": 2.0,
+    "cast": []
+  },
+  "waves": {
+    "festoon_strength": 1.6,
+    "festoon_wavenumber": 20,
+    "hotspot_depth": 1.0,
+    "ribbon_strength": 0.0,
+    "ribbon_wavenumber": 12,
+    "festoon_hero_strength": 0.0,
+    "festoon_hero_wavenumber": 11
+  },
+  "poles": {
+    "north": {
+      "style": "cyclone_cluster",
+      "cyclone_count": 8,
+      "polygon_sides": 6,
+      "strength": 1.35,
+      "field_density": 1.4
+    },
+    "south": {
+      "style": "cyclone_cluster",
+      "cyclone_count": 5,
+      "polygon_sides": 6,
+      "strength": 1.35,
+      "field_density": 1.4
+    }
+  },
+  "appearance": {
+    "palette_rows": [
+      {
+        "latitude": -78.5,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.1849,
+              0.2049,
+              0.2017
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.3602,
+              0.3822,
+              0.3749
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.6449,
+              0.6649,
+              0.6529
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8438,
+              0.8814,
+              0.8688
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.8438,
+              0.8814,
+              0.8688
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": -57.5,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.217,
+              0.1962,
+              0.1546
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.3769,
+              0.3471,
+              0.3022
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.5107,
+              0.4756,
+              0.4248
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.6454,
+              0.6089,
+              0.5644
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.8915,
+              0.8659,
+              0.8276
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": -45.7,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.2946,
+              0.2627,
+              0.2162
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.4199,
+              0.3863,
+              0.3452
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.5752,
+              0.5596,
+              0.5243
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.7191,
+              0.707,
+              0.6787
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.9555,
+              0.9597,
+              0.943
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": -40.1,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.347,
+              0.3289,
+              0.2964
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.4596,
+              0.4446,
+              0.4146
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.5762,
+              0.5646,
+              0.5375
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.7689,
+              0.7689,
+              0.7488
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": -28.1,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.3632,
+              0.3524,
+              0.3272
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.5806,
+              0.5768,
+              0.5616
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.7589,
+              0.7747,
+              0.7708
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8774,
+              0.9055,
+              0.9216
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": -13.4,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.4197,
+              0.3427,
+              0.2609
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.542,
+              0.4701,
+              0.4016
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.6636,
+              0.613,
+              0.5585
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8667,
+              0.8667,
+              0.8587
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": -0.7,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.3853,
+              0.3173,
+              0.2555
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.6138,
+              0.5793,
+              0.5371
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.8002,
+              0.8121,
+              0.8161
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.9222,
+              0.9422,
+              0.9422
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": 12.0,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.4069,
+              0.2861,
+              0.1682
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.5081,
+              0.3913,
+              0.2846
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.6506,
+              0.5572,
+              0.4637
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8469,
+              0.8268,
+              0.8026
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.9996,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": 20.1,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.3961,
+              0.2732,
+              0.1517
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.5295,
+              0.4388,
+              0.3436
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.6926,
+              0.6455,
+              0.5984
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8646,
+              0.8889,
+              0.8929
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.9604,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": 23.5,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.3808,
+              0.2987,
+              0.211
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.5592,
+              0.5099,
+              0.4566
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.7291,
+              0.7134,
+              0.6897
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8727,
+              0.909,
+              0.9252
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.9767,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": 33.3,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.3751,
+              0.3425,
+              0.2989
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.522,
+              0.4843,
+              0.4388
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.6404,
+              0.6055,
+              0.5627
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.8426,
+              0.8548,
+              0.8548
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      },
+      {
+        "latitude": 66.0,
+        "stops": [
+          {
+            "pos": 0.0,
+            "color": [
+              0.1777,
+              0.181,
+              0.1607
+            ]
+          },
+          {
+            "pos": 0.25,
+            "color": [
+              0.3682,
+              0.3719,
+              0.3494
+            ]
+          },
+          {
+            "pos": 0.5,
+            "color": [
+              0.4956,
+              0.4956,
+              0.4721
+            ]
+          },
+          {
+            "pos": 0.75,
+            "color": [
+              0.6285,
+              0.6245,
+              0.6001
+            ]
+          },
+          {
+            "pos": 1.0,
+            "color": [
+              0.8489,
+              0.8447,
+              0.8149
+            ]
+          }
+        ]
+      }
+    ],
+    "storm_tints": [
+      {
+        "pos": 0.0,
+        "color": [
+          0.42,
+          0.5,
+          0.62
+        ]
+      },
+      {
+        "pos": 0.5,
+        "color": [
+          0.7,
+          0.58,
+          0.44
+        ]
+      },
+      {
+        "pos": 0.72,
+        "color": [
+          0.56,
+          0.31,
+          0.19
+        ]
+      },
+      {
+        "pos": 0.85,
+        "color": [
+          0.8,
+          0.4,
+          0.18
+        ]
+      },
+      {
+        "pos": 1.0,
+        "color": [
+          0.86,
+          0.44,
+          0.2
+        ]
+      }
+    ],
+    "band_tint_stops": [
+      {
+        "pos": 0.0,
+        "color": [
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      {
+        "pos": 1.0,
+        "color": [
+          0.5,
+          0.5,
+          0.5
+        ]
+      }
+    ],
+    "band_tint_strength": 0.0,
+    "haze_amount": 0.05,
+    "haze_color": [
+      0.85,
+      0.78,
+      0.62
+    ],
+    "contrast": 0.8,
+    "saturation": 1.0,
+    "gamma": 1.0,
+    "chroma_scale": 1.0,
+    "chroma_variance": 0.45,
+    "hue_variance": 0.3,
+    "detail_chroma": 0.0,
+    "chroma_aging": 0.35,
+    "polar_tint_color": [
+      0.36,
+      0.46,
+      0.61
+    ],
+    "polar_tint_strength": 0.68,
+    "polar_tint_start_lat": 56.0,
+    "polar_canvas_value": 0.85
+  },
+  "detail": {
+    "intensity": 0.95,
+    "flow_phases": 4,
+    "flow_stretch": 1.3,
+    "frequency": 64.0,
+    "cellular_amount": 0.9,
+    "striation_amount": 1.0,
+    "striation_frequency": 160.0,
+    "polar_stipple": 0.8,
+    "intermittency": 0.65,
+    "hero_calm": 0.75,
+    "hero_spiral": 0.55,
+    "hero_collar_wrap": 0.5,
+    "zone_texture": 1.0,
+    "belt_texture": 1.2,
+    "belt_texture_fine": 1.4,
+    "mottle": 1.1,
+    "polar_filaments": 1.3,
+    "spread": 0.3,
+    "cirrus_fibers": 0.0,
+    "cirrus_fiber_freq": 6.0,
+    "streak_mute": 0.0,
+    "hero_wake_braid": 0.0
+  },
+  "mask": {
+    "file": null,
+    "band_fade": 0.0,
+    "emission_gain": 0.0,
+    "detail_gain": 0.0
+  },
+  "emission": {
+    "thermal_strength": 0.35,
+    "thermal_color": [
+      1.0,
+      0.36,
+      0.08
+    ],
+    "thermal_threshold": 0.18,
+    "thermal_hdr": 16.0,
+    "lightning_strength": 0.15,
+    "lightning_color": [
+      0.72,
+      0.82,
+      1.0
+    ],
+    "lightning_density": 0.5,
+    "aurora_strength": 0.0,
+    "aurora_color": [
+      0.85,
+      0.35,
+      0.6
+    ],
+    "aurora_radius": 14.0,
+    "aurora_width": 2.5,
+    "aurora_pole_offset": 8.0
+  },
+  "physical": {
+    "radius_km": 69911.0,
+    "height_scale": 0.004,
+    "height_midlevel": 0.5,
+    "ring_inner_km": 74500.0,
+    "ring_outer_km": 136780.0
+  },
+  "rings": {
+    "enabled": false,
+    "opacity": 1.0,
+    "brightness": 1.0,
+    "tint_color": [
+      0.86,
+      0.83,
+      0.78
+    ],
+    "fine_grain": 0.15
+  },
+  "export": {
+    "width": 2048,
+    "projection": "equirect",
+    "png_compression": 2,
+    "emission_half": false,
+    "flow_map": false
+  }
+}
