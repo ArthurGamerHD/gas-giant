@@ -157,7 +157,7 @@ namespace GasGiantNet.Sim
 
         public static VortexRegistry Generate(int seed, BandLayout bands, LatProfiles profiles, ParamTree p, double? dt, int devSteps, double stepScale)
         {
-            NumpyGenerator rng = NumpyGenerator.Subseed(seed, "storms");
+            RandomGenerator rng = RandomGenerator.Subseed(seed, "storms");
             VortexRegistry reg = new VortexRegistry();
             reg.StepScale = stepScale;
             int eff = ResolutionScaling.ScaleDuration(devSteps, stepScale);
@@ -260,7 +260,7 @@ namespace GasGiantNet.Sim
             }
 
             if (p.Double("storms.small_density") > 0.0)
-                AddSmallStorms(reg, NumpyGenerator.Subseed(seed, "small-storms"), zones, belts, profiles, p.Double("storms.small_density"));
+                AddSmallStorms(reg, RandomGenerator.Subseed(seed, "small-storms"), zones, belts, profiles, p.Double("storms.small_density"));
 
             double stampContrast = p.Double("storms.stamp_contrast");
             double? tintOverride = NullableDouble(p, "storms.stamp_tint_contrast");
@@ -278,7 +278,7 @@ namespace GasGiantNet.Sim
 
             if (p.Has("poles"))
             {
-                NumpyGenerator polar = NumpyGenerator.Subseed(seed, "poles");
+                RandomGenerator polar = RandomGenerator.Subseed(seed, "poles");
                 AddPolarVortices(reg, polar, +1.0, p.String("poles.north.style"), p.Int("poles.north.cyclone_count"), p.Double("poles.north.strength"), p.Double("poles.north.field_density"));
                 AddPolarVortices(reg, polar, -1.0, p.String("poles.south.style"), p.Int("poles.south.cyclone_count"), p.Double("poles.south.strength"), p.Double("poles.south.field_density"));
             }
@@ -286,12 +286,12 @@ namespace GasGiantNet.Sim
             EnforceCap(reg);
 
             if (p.Double("storms.merge_rate") > 0.0 && dt.HasValue && devSteps > 0)
-                SeedConvergentPairs(reg, NumpyGenerator.Subseed(seed, "mergers"), zones, profiles, p.Double("storms.merge_rate"), dt.Value, eff, stepScale);
+                SeedConvergentPairs(reg, RandomGenerator.Subseed(seed, "mergers"), zones, profiles, p.Double("storms.merge_rate"), dt.Value, eff, stepScale);
 
             if (p.Int("storms.accent_count") > 0)
-                AddAccentOvals(reg, NumpyGenerator.Subseed(seed, "accent-ovals"), zones, profiles, p, dt, eff);
+                AddAccentOvals(reg, RandomGenerator.Subseed(seed, "accent-ovals"), zones, profiles, p, dt, eff);
             if (p.Int("storms.hero_companions") > 0)
-                AddHeroCompanions(reg, NumpyGenerator.Subseed(seed, "hero-companions"), profiles, p.Int("storms.hero_companions"), p.Double("storms.companion_aspect"), p.Double("storms.companion_brightness"));
+                AddHeroCompanions(reg, RandomGenerator.Subseed(seed, "hero-companions"), profiles, p.Int("storms.hero_companions"), p.Double("storms.companion_aspect"), p.Double("storms.companion_brightness"));
             JsonArray cast = p.Array("storms.cast");
             if (cast.Count > 0) AddCast(reg, profiles, p, dt, eff);
 
@@ -451,7 +451,7 @@ namespace GasGiantNet.Sim
             }
         }
 
-        private static void AddPolarVortices(VortexRegistry reg, NumpyGenerator rng, double poleSign, string style, int cycloneCount, double strength, double fieldDensity)
+        private static void AddPolarVortices(VortexRegistry reg, RandomGenerator rng, double poleSign, string style, int cycloneCount, double strength, double fieldDensity)
         {
             if (style == "calm" || strength <= 0.0) return;
             double poleLat = poleSign * Math.PI / 2.0;
@@ -491,7 +491,7 @@ namespace GasGiantNet.Sim
             }
         }
 
-        private static void AddSmallStorms(VortexRegistry reg, NumpyGenerator rng, List<double[]> zones, List<double[]> belts, LatProfiles profiles, double density)
+        private static void AddSmallStorms(VortexRegistry reg, RandomGenerator rng, List<double[]> zones, List<double[]> belts, LatProfiles profiles, double density)
         {
             for (int pass = 0; pass < 2; pass++)
             {
@@ -522,7 +522,7 @@ namespace GasGiantNet.Sim
             }
         }
 
-        private static void AddAccentOvals(VortexRegistry reg, NumpyGenerator rng, List<double[]> zones, LatProfiles profiles, ParamTree p, double? dt, int devSteps)
+        private static void AddAccentOvals(VortexRegistry reg, RandomGenerator rng, List<double[]> zones, LatProfiles profiles, ParamTree p, double? dt, int devSteps)
         {
             double radius = p.Double("storms.accent_radius");
             double cap = Math.Min(MaxVortexLat, (63.0 - 206.3 * radius) * Math.PI / 180.0);
@@ -555,7 +555,7 @@ namespace GasGiantNet.Sim
             }
         }
 
-        private static void AddHeroCompanions(VortexRegistry reg, NumpyGenerator rng, LatProfiles profiles, int count, double aspect, double brightness)
+        private static void AddHeroCompanions(VortexRegistry reg, RandomGenerator rng, LatProfiles profiles, int count, double aspect, double brightness)
         {
             List<Vortex> heroes = reg.Heroes();
             for (int h = 0; h < heroes.Count; h++)
@@ -638,7 +638,7 @@ namespace GasGiantNet.Sim
             }
         }
 
-        private static void SeedConvergentPairs(VortexRegistry reg, NumpyGenerator rng, List<double[]> zones, LatProfiles profiles, double mergeRate, double dt, int devSteps, double stepScale)
+        private static void SeedConvergentPairs(VortexRegistry reg, RandomGenerator rng, List<double[]> zones, LatProfiles profiles, double mergeRate, double dt, int devSteps, double stepScale)
         {
             int pairIndex = 0;
             for (int z = 0; z < zones.Count; z++)
@@ -747,7 +747,7 @@ namespace GasGiantNet.Sim
             return result;
         }
 
-        private static List<double> PoissonLons(NumpyGenerator rng, int count, double minSep)
+        private static List<double> PoissonLons(RandomGenerator rng, int count, double minSep)
         {
             List<double> lons = new List<double>();
             for (int i = 0; i < count * 8 && lons.Count < count; i++)

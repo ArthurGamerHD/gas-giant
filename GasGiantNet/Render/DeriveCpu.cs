@@ -58,8 +58,8 @@ namespace GasGiantNet.Render
             float hueVariance=p.Float("appearance.hue_variance");
             float chromaAging=p.Float("appearance.chroma_aging");
             bool chromaOn=chromaScale!=1.0f||chromaVariance>0.0f||hueVariance>0.0f||chromaAging>0.0f;
-            V3 chromaOffset=Draw3(NumpyGenerator.Subseed(p.Int("seed"),"chroma-variance"));
-            V3 hueOffset=Draw3(NumpyGenerator.Subseed(p.Int("seed"),"hue-variance"));
+            V3 chromaOffset=Draw3(RandomGenerator.Subseed(p.Int("seed"),"chroma-variance"));
+            V3 hueOffset=Draw3(RandomGenerator.Subseed(p.Int("seed"),"hue-variance"));
 
             bool maskOn=mask!=null&&(p.Float("mask.band_fade")>0.0f||p.Float("mask.emission_gain")>0.0f||p.Float("mask.detail_gain")>0.0f);
             float maskBandFade=p.Float("mask.band_fade"),maskEmissionGain=p.Float("mask.emission_gain"),maskDetailGain=p.Float("mask.detail_gain");
@@ -220,9 +220,9 @@ namespace GasGiantNet.Render
             EmissionContext c=new EmissionContext();
             c.ThermalColor=Read3(p,"emission.thermal_color");c.ThermalStrength=p.Float("emission.thermal_strength");c.Threshold=p.Float("emission.thermal_threshold");c.Hdr=p.Float("emission.thermal_hdr");
             c.LightningColor=Read3(p,"emission.lightning_color");c.LightningStrength=p.Float("emission.lightning_strength");c.Density=p.Float("emission.lightning_density");
-            c.LightningOffset=Draw3(NumpyGenerator.Subseed(p.Int("seed"),"emission-lightning"));
+            c.LightningOffset=Draw3(RandomGenerator.Subseed(p.Int("seed"),"emission-lightning"));
             c.AuroraStrength=p.Float("emission.aurora_strength");c.Radius=p.Float("emission.aurora_radius")*Glsl.PI/180.0f;c.Width=p.Float("emission.aurora_width")*Glsl.PI/180.0f;
-            NumpyGenerator au=NumpyGenerator.Subseed(p.Int("seed"),"emission-aurora");
+            RandomGenerator au=RandomGenerator.Subseed(p.Int("seed"),"emission-aurora");
             c.AuroraOffset=Draw3(au);float tilt=p.Float("emission.aurora_pole_offset")*Glsl.PI/180.0f;float lonN=(float)au.Uniform(-Math.PI,Math.PI),lonS=(float)au.Uniform(-Math.PI,Math.PI);float st=MathF.Sin(tilt),ct=MathF.Cos(tilt);
             c.PoleN=new V3(st*MathF.Cos(lonN),ct,st*MathF.Sin(lonN));c.PoleS=new V3(st*MathF.Cos(lonS),-ct,st*MathF.Sin(lonS));
             return c;
@@ -259,7 +259,7 @@ namespace GasGiantNet.Render
 
         private static bool EmissionEnabled(ParamTree p){return p.Float("emission.thermal_strength")>0.0f||p.Float("emission.lightning_strength")>0.0f||p.Float("emission.aurora_strength")>0.0f;}
         private static V3 Read3(ParamTree p,string path){float[] a=p.FloatArray(path);return new V3(a[0],a[1],a[2]);}
-        private static V3 Draw3(NumpyGenerator r){return new V3((float)r.Uniform(-100.0,100.0),(float)r.Uniform(-100.0,100.0),(float)r.Uniform(-100.0,100.0));}
+        private static V3 Draw3(RandomGenerator r){return new V3((float)r.Uniform(-100.0,100.0),(float)r.Uniform(-100.0,100.0),(float)r.Uniform(-100.0,100.0));}
         private static float Luma(V3 c){return c.X*0.2126f+c.Y*0.7152f+c.Z*0.0722f;}
         private static V3 PowGamma(V3 c,float e){return new V3(MathF.Pow(c.X,e),MathF.Pow(c.Y,e),MathF.Pow(c.Z,e));}
     }

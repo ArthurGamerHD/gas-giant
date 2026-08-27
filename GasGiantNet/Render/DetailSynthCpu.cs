@@ -386,12 +386,12 @@ namespace GasGiantNet.Render
         private static DetailContext BuildContext(CpuSimulation sim)
         {
             DetailContext c=new DetailContext();c.Params=sim.Params;c.Sim=sim;
-            c.Offset=Draw3(NumpyGenerator.Subseed(sim.Params.Int("seed"),"detail-synth"));
-            c.OffsetGate=Draw3(NumpyGenerator.Subseed(sim.Params.Int("seed"),"detail-intermittency"));
-            c.OffsetSpiral=Draw3(NumpyGenerator.Subseed(sim.Params.Int("seed"),"detail-hero-spiral"));
-            c.OffsetMottle=Draw3(NumpyGenerator.Subseed(sim.Params.Int("seed"),"detail-mottle"));
-            c.OffsetCirrus=Draw3(NumpyGenerator.Subseed(sim.Params.Int("seed"),"detail-cirrus"));
-            c.OffsetBraid=Draw3(NumpyGenerator.Subseed(sim.Params.Int("seed"),"detail-wake-braid"));
+            c.Offset=Draw3(RandomGenerator.Subseed(sim.Params.Int("seed"),"detail-synth"));
+            c.OffsetGate=Draw3(RandomGenerator.Subseed(sim.Params.Int("seed"),"detail-intermittency"));
+            c.OffsetSpiral=Draw3(RandomGenerator.Subseed(sim.Params.Int("seed"),"detail-hero-spiral"));
+            c.OffsetMottle=Draw3(RandomGenerator.Subseed(sim.Params.Int("seed"),"detail-mottle"));
+            c.OffsetCirrus=Draw3(RandomGenerator.Subseed(sim.Params.Int("seed"),"detail-cirrus"));
+            c.OffsetBraid=Draw3(RandomGenerator.Subseed(sim.Params.Int("seed"),"detail-wake-braid"));
             c.Heroes=BuildHeroes(sim);c.Clouds=BuildClouds(sim);c.HeroEmergence=sim.Vortices.SceneEmergence(sim.Params)>0&&c.Heroes.Length>0;
             c.Spread=sim.Params.Float("detail.spread")>0;
             c.Fx=sim.Params.Float("detail.intermittency")>0||sim.Params.Float("detail.hero_spiral")>0||sim.Params.Float("detail.hero_collar_wrap")>0||sim.Params.Float("detail.belt_texture")>0||sim.Params.Float("detail.belt_texture_fine")>0||sim.Params.Float("detail.zone_texture")>0||sim.Params.Float("detail.mottle")>0||sim.Params.Float("detail.polar_filaments")>0||sim.Params.Float("detail.cirrus_fibers")>0||sim.Params.Float("detail.streak_mute")>0||sim.Params.Float("detail.hero_wake_braid")>0;
@@ -412,7 +412,7 @@ namespace GasGiantNet.Render
             return r.ToArray();
         }
 
-        private static V3 Draw3(NumpyGenerator rng){return new V3((float)rng.Uniform(-100,100),(float)rng.Uniform(-100,100),(float)rng.Uniform(-100,100));}
+        private static V3 Draw3(RandomGenerator rng){return new V3((float)rng.Uniform(-100,100),(float)rng.Uniform(-100,100),(float)rng.Uniform(-100,100));}
         private static V3 SpherePt(V2 ll){float cl=MathF.Cos(ll.Y);return new V3(cl*MathF.Cos(ll.X),MathF.Sin(ll.Y),cl*MathF.Sin(ll.X));}
         private static V2 EqUv(V2 ll){return new V2((ll.X+Pi)/(2*Pi),(0.5f*Pi-ll.Y)/Pi);}
         private static V2 PatchUv(V2 ll,float rhoMax){float rho=0.5f*Pi-MathF.Abs(ll.Y);V2 st=new V2(rho*MathF.Cos(ll.X),rho*MathF.Sin(ll.X));return st/rhoMax*0.5f+new V2(0.5f,0.5f);}

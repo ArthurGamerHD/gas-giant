@@ -42,7 +42,7 @@ namespace GasGiantNet.Sim
 
         public static EventSchedule Generate(int seed, ParamTree p, BandLayout bands, LatProfiles profiles, double? dt)
         {
-            NumpyGenerator rng = NumpyGenerator.Subseed(seed, "events");
+            RandomGenerator rng = RandomGenerator.Subseed(seed, "events");
             double s = ResolutionScaling.ScaleFactor(p);
             EventSchedule sched = new EventSchedule();
             sched.Strength = p.Double("storms.outbreak_strength");

@@ -31,8 +31,8 @@ namespace GasGiantNet
             try
             {
                 Options o=Parse(args);if(o.Help){PrintHelp();return 0;}
-                NumpyParitySelfTest.Run();
-                if(o.SelfTest){Console.WriteLine("NumPy RNG parity self-test passed.");return 0;}
+                RandomSelfTest.Run();
+                if(o.SelfTest){Console.WriteLine("System.Random distribution self-test passed.");return 0;}
                 string baseDir=AppContext.BaseDirectory;
                 ParamTree p;
                 if(File.Exists(o.Preset))p=ParamTree.LoadPresetFile(o.Preset,Path.Combine(baseDir,"PresetsResolved","_defaults.json"));
@@ -98,7 +98,7 @@ namespace GasGiantNet
             Console.WriteLine("  --threads N          max CPU workers; 0 = runtime default");
             Console.WriteLine("  --compression 0..9   PNG compression request");
             Console.WriteLine("  --checkpoint-step N  emit checkpoint color PNGs every N development steps");
-            Console.WriteLine("  --self-test          run deterministic NumPy RNG parity vectors and exit");
+            Console.WriteLine("  --self-test          test deterministic System.Random streams and distributions");
         }
     }
 }

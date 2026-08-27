@@ -22,7 +22,7 @@ namespace GasGiantNet.Export
         {
             float[] tau=new float[RingWidth];
             for(int r=0;r<RingWidth;r++)tau[r]=(float)Interp((r+0.5)/(double)RingWidth);
-            NumpyGenerator rng=NumpyGenerator.Subseed(p.Int("seed"),"rings");
+            RandomGenerator rng=RandomGenerator.Subseed(p.Int("seed"),"rings");
             float grain=p.Float("rings.fine_grain");
             float[] rg=new float[RingWidth],yg=new float[RingHeight];
             for(int i=0;i<RingWidth;i++)rg[i]=1.0f+grain*0.6f*((float)rng.Random()-0.5f);

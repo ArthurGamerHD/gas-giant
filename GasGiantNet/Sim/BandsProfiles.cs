@@ -83,7 +83,7 @@ namespace GasGiantNet.Sim
         {
             if (p.Has("bands.template")) return FromTemplate(seed, p);
 
-            NumpyGenerator rng = NumpyGenerator.Subseed(seed, "bands");
+            RandomGenerator rng = RandomGenerator.Subseed(seed, "bands");
             int count = p.Int("bands.count");
             double jitter = p.Double("bands.width_jitter");
             double[] widths = new double[count];
@@ -93,7 +93,7 @@ namespace GasGiantNet.Sim
                 if (widths[i] < 0.15) widths[i] = 0.15;
             }
 
-            NumpyGenerator tail = NumpyGenerator.Subseed(seed, "width-tail");
+            RandomGenerator tail = RandomGenerator.Subseed(seed, "width-tail");
             double widthTail = p.Double("bands.width_tail");
             for (int i = 0; i < count; i++) widths[i] *= Math.Exp(widthTail * tail.Normal(0.0, 0.9));
 
@@ -125,7 +125,7 @@ namespace GasGiantNet.Sim
                 heights64[i] = bh + rng.Uniform(-0.08, 0.08);
             }
 
-            NumpyGenerator hue = NumpyGenerator.Subseed(seed, "band-hues");
+            RandomGenerator hue = RandomGenerator.Subseed(seed, "band-hues");
             double hueJitter = p.Double("bands.hue_jitter");
             for (int i = 0; i < count; i++) values64[i] += hueJitter * hue.Uniform(-1.0, 1.0);
             for (int i = 0; i < count; i++)
@@ -154,7 +154,7 @@ namespace GasGiantNet.Sim
 
         private static BandLayout Finish(int seed, double[] edges64, double[] values64, double[] heights64, bool[] isBelt, ParamTree p)
         {
-            NumpyGenerator rng = NumpyGenerator.Subseed(seed, "faded-sector");
+            RandomGenerator rng = RandomGenerator.Subseed(seed, "faded-sector");
             double lon = rng.Uniform(-Math.PI, Math.PI);
             double halfWidth = rng.Uniform(38.0, 58.0) * Math.PI / 180.0;
             int fadeIndex = -1;
@@ -251,7 +251,7 @@ namespace GasGiantNet.Sim
         {
             int n = Samples;
             double[] lat = Linspace(Math.PI / 2.0, -Math.PI / 2.0, n);
-            NumpyGenerator rng = NumpyGenerator.Subseed(seed, "jets");
+            RandomGenerator rng = RandomGenerator.Subseed(seed, "jets");
             double[] edges = ToDouble(bands.Edges);
             double[] widths = new double[edges.Length - 1];
             for (int i = 0; i < widths.Length; i++) widths[i] = edges[i] - edges[i + 1];
@@ -336,7 +336,7 @@ namespace GasGiantNet.Sim
 
             int edgeSoftCount = Math.Max(bands.Values.Length - 1, 1);
             double[] softMult = new double[edgeSoftCount];
-            NumpyGenerator soft = NumpyGenerator.Subseed(seed, "edge-softness");
+            RandomGenerator soft = RandomGenerator.Subseed(seed, "edge-softness");
             double diversity = p.Double("bands.edge_diversity");
             for (int i = 0; i < softMult.Length; i++) softMult[i] = Math.Exp(diversity * soft.Uniform(-1.2, 1.2));
 
@@ -366,7 +366,7 @@ namespace GasGiantNet.Sim
         {
             List<double[]> lanes = new List<double[]>();
             if (density <= 0.0) return lanes;
-            NumpyGenerator rng = NumpyGenerator.Subseed(seed, "lanes");
+            RandomGenerator rng = RandomGenerator.Subseed(seed, "lanes");
             for (int i = 1; i < bands.Edges.Length - 1; i++)
             {
                 double roll = rng.Uniform(0.0, 1.0);

@@ -22,23 +22,23 @@ namespace GasGiantNet.Sim
         public static SimStaticUniforms Build(int seed, int heroShapeSeed)
         {
             SimStaticUniforms u = new SimStaticUniforms();
-            u.VarianceOffset = Draw3(NumpyGenerator.Subseed(seed, "band-variance"), -100.0, 100.0);
-            u.WarpOffset = Draw3(NumpyGenerator.Subseed(seed, "warp-noise"), -100.0, 100.0);
-            u.DetailOffset = Draw3(NumpyGenerator.Subseed(seed, "detail-noise"), -100.0, 100.0);
+            u.VarianceOffset = Draw3(RandomGenerator.Subseed(seed, "band-variance"), -100.0, 100.0);
+            u.WarpOffset = Draw3(RandomGenerator.Subseed(seed, "warp-noise"), -100.0, 100.0);
+            u.DetailOffset = Draw3(RandomGenerator.Subseed(seed, "detail-noise"), -100.0, 100.0);
             u.HeroNoiseOffset = u.DetailOffset;
-            u.TurbOffset = Draw3(NumpyGenerator.Subseed(seed, "turbulence"), -100.0, 100.0);
-            u.KhPhase = (float)NumpyGenerator.Subseed(seed, "kh-wave").Uniform(0.0, 2.0 * Math.PI);
-            u.PolyPhase = (float)NumpyGenerator.Subseed(seed, "poly-jet").Uniform(0.0, 2.0 * Math.PI);
-            NumpyGenerator waves = NumpyGenerator.Subseed(seed, "eq-waves");
+            u.TurbOffset = Draw3(RandomGenerator.Subseed(seed, "turbulence"), -100.0, 100.0);
+            u.KhPhase = (float)RandomGenerator.Subseed(seed, "kh-wave").Uniform(0.0, 2.0 * Math.PI);
+            u.PolyPhase = (float)RandomGenerator.Subseed(seed, "poly-jet").Uniform(0.0, 2.0 * Math.PI);
+            RandomGenerator waves = RandomGenerator.Subseed(seed, "eq-waves");
             u.FestPhase = (float)waves.Uniform(0.0, 2.0 * Math.PI);
             u.RibPhase = (float)waves.Uniform(0.0, 2.0 * Math.PI);
             u.Fest2Phase = (float)waves.Uniform(0.0, 2.0 * Math.PI);
-            NumpyGenerator shape = NumpyGenerator.Subseed(seed, "hero-shape:" + heroShapeSeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            RandomGenerator shape = RandomGenerator.Subseed(seed, "hero-shape:" + heroShapeSeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
             u.HeroShapePhase = Draw3(shape, 0.0, 2.0 * Math.PI);
             return u;
         }
 
-        private static V3 Draw3(NumpyGenerator rng, double lo, double hi)
+        private static V3 Draw3(RandomGenerator rng, double lo, double hi)
         {
             return new V3((float)rng.Uniform(lo, hi), (float)rng.Uniform(lo, hi), (float)rng.Uniform(lo, hi));
         }
