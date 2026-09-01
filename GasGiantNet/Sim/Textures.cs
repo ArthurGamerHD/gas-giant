@@ -85,8 +85,51 @@ namespace GasGiantNet.Sim
             return Glsl.Mix(Glsl.Mix(a,b,fx), Glsl.Mix(c,d,fx), fy);
         }
 
-        public float SampleLinear1(V2 uv) { return SampleLinear(uv).X; }
-        public V2 SampleLinear2(V2 uv) { V4 q=SampleLinear(uv); return new V2(q.X,q.Y); }
+        // Specialized scalar and RG samplers avoid constructing/filling a V4
+        // and avoid four TexelFetch4 calls in the hottest velocity/scalar paths.
+        public float SampleLinear1(V2 uv)
+        {
+            float gx=uv.X*Width-0.5f, gy=uv.Y*Height-0.5f;
+            int x0=(int)MathF.Floor(gx), y0=(int)MathF.Floor(gy);
+            float fx=gx-x0, fy=gy-y0;
+
+            int ax0=AddressX(x0), ax1=AddressX(x0+1);
+            int ay0=AddressY(y0), ay1=AddressY(y0+1);
+
+            int i00=((ay0*Width+ax0)*Channels);
+            int i10=((ay0*Width+ax1)*Channels);
+            int i01=((ay1*Width+ax0)*Channels);
+            int i11=((ay1*Width+ax1)*Channels);
+
+            float a=Data[i00], b=Data[i10];
+            float c=Data[i01], d=Data[i11];
+            return Glsl.Mix(Glsl.Mix(a,b,fx),Glsl.Mix(c,d,fx),fy);
+        }
+
+        public V2 SampleLinear2(V2 uv)
+        {
+            if(Channels<2) return new V2(SampleLinear1(uv),0.0f);
+
+            float gx=uv.X*Width-0.5f, gy=uv.Y*Height-0.5f;
+            int x0=(int)MathF.Floor(gx), y0=(int)MathF.Floor(gy);
+            float fx=gx-x0, fy=gy-y0;
+
+            int ax0=AddressX(x0), ax1=AddressX(x0+1);
+            int ay0=AddressY(y0), ay1=AddressY(y0+1);
+
+            int i00=((ay0*Width+ax0)*Channels);
+            int i10=((ay0*Width+ax1)*Channels);
+            int i01=((ay1*Width+ax0)*Channels);
+            int i11=((ay1*Width+ax1)*Channels);
+
+            float xA=Glsl.Mix(Data[i00],Data[i10],fx);
+            float xB=Glsl.Mix(Data[i01],Data[i11],fx);
+            float yA=Glsl.Mix(Data[i00+1],Data[i10+1],fx);
+            float yB=Glsl.Mix(Data[i01+1],Data[i11+1],fx);
+
+            return new V2(Glsl.Mix(xA,xB,fy),
+                          Glsl.Mix(yA,yB,fy));
+        }
 
         private static V4 CrWeights(float t)
         {
@@ -100,6 +143,24 @@ namespace GasGiantNet.Sim
             int bx=(int)MathF.Floor(gx), by=(int)MathF.Floor(gy);
             float fx=gx-bx, fy=gy-by;
             V4 wx=CrWeights(fx), wy=CrWeights(fy);
+
+            // Tracer textures are RGBA. Resolve wrapping/clamping once for the
+            // entire 4x4 footprint, then index the backing array directly.
+            if(Channels==4)
+            {
+                int x0=AddressX(bx-1), x1=AddressX(bx);
+                int x2=AddressX(bx+1), x3=AddressX(bx+2);
+                int y0=AddressY(by-1), y1=AddressY(by);
+                int y2=AddressY(by+1), y3=AddressY(by+2);
+
+                V4 acc4=new V4(0,0,0,0);
+                acc4+=CatmullRow4(y0,x0,x1,x2,x3,wx)*wy.X;
+                acc4+=CatmullRow4(y1,x0,x1,x2,x3,wx)*wy.Y;
+                acc4+=CatmullRow4(y2,x0,x1,x2,x3,wx)*wy.Z;
+                acc4+=CatmullRow4(y3,x0,x1,x2,x3,wx)*wy.W;
+                return acc4;
+            }
+
             V4 acc=new V4(0,0,0,0);
             for(int j=0;j<4;j++)
             {
@@ -108,6 +169,17 @@ namespace GasGiantNet.Sim
                 acc += row * wy[j];
             }
             return acc;
+        }
+
+        private V4 CatmullRow4(int y,int x0,int x1,int x2,int x3,V4 w)
+        {
+            int row=y*Width*4;
+            int i0=row+x0*4, i1=row+x1*4, i2=row+x2*4, i3=row+x3*4;
+            V4 q0=new V4(Data[i0],Data[i0+1],Data[i0+2],Data[i0+3]);
+            V4 q1=new V4(Data[i1],Data[i1+1],Data[i1+2],Data[i1+3]);
+            V4 q2=new V4(Data[i2],Data[i2+1],Data[i2+2],Data[i2+3]);
+            V4 q3=new V4(Data[i3],Data[i3+1],Data[i3+2],Data[i3+3]);
+            return q0*w.X+q1*w.Y+q2*w.Z+q3*w.W;
         }
 
         public void MinMax2x2Pixel(V2 pos, out V4 lo, out V4 hi)

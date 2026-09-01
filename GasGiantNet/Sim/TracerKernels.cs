@@ -33,6 +33,10 @@ namespace GasGiantNet.Sim
     {
         public static void Init(SimDomain d, TracerKernelContext c, int threads)
         {
+            float warpFreq=c.Params.Float("bands.warp_freq");
+            float warpAmount=c.Params.Float("bands.warp_amount");
+            float detailFreq=c.Params.Float("bands.detail_freq");
+            float detailAmount=c.Params.Float("bands.detail_amount");
             int w = d.Width, h = d.Height;
             CpuParallel.ForRows(h, threads, delegate(int y)
             {
@@ -40,7 +44,7 @@ namespace GasGiantNet.Sim
                 {
                     V2 ll = DomainMath.LonLatAt(d.Kind, x, y, w, h, d.RhoMax);
                     V3 sp = DomainMath.SpherePoint(ll);
-                    float warp = Noise3D.Fbm(sp * c.Params.Float("bands.warp_freq") + c.Static.WarpOffset, 4, 2.0f, 0.5f) * c.Params.Float("bands.warp_amount");
+                    float warp = Noise3D.Fbm(sp * warpFreq + c.Static.WarpOffset, 4, 2.0f, 0.5f) * warpAmount;
                     float stampLat = c.VortexStamp != null && c.VortexStamp.HeroEmergence
                         ? VortexStampCpu.HeroBandDeflect(sp, ll.Y, c.VortexStamp) + warp
                         : ll.Y + warp;
@@ -49,10 +53,10 @@ namespace GasGiantNet.Sim
                     float s1 = stamp.Y;
                     BandStampCpu.Mod(ref s0, ref s1, sp, ll, c.Params, c.Bands, c.Static);
 
-                    float perturb = Noise3D.Fbm(sp * c.Params.Float("bands.detail_freq") + c.Static.DetailOffset, 5, 2.0f, 0.5f);
-                    float t0 = s0 + perturb * c.Params.Float("bands.detail_amount");
-                    float t1 = s1 + perturb * c.Params.Float("bands.detail_amount") * 0.5f;
-                    float t2 = 0.5f + 0.5f * Noise3D.Fbm(sp * (c.Params.Float("bands.detail_freq") * 2.0f) + c.Static.DetailOffset.ZXY, 5, 2.0f, 0.5f);
+                    float perturb = Noise3D.Fbm(sp * detailFreq + c.Static.DetailOffset, 5, 2.0f, 0.5f);
+                    float t0 = s0 + perturb * detailAmount;
+                    float t1 = s1 + perturb * detailAmount * 0.5f;
+                    float t2 = 0.5f + 0.5f * Noise3D.Fbm(sp * (detailFreq * 2.0f) + c.Static.DetailOffset.ZXY, 5, 2.0f, 0.5f);
                     V3 vs = c.VortexStamp != null ? VortexStampCpu.Stamp(sp, c.VortexStamp) : new V3(0,0,0);
                     t0 += vs.X;
                     t1 += vs.Y;
@@ -101,6 +105,9 @@ namespace GasGiantNet.Sim
 
         private static void CorrectPass(SimDomain d, TracerKernelContext c, float dt, int threads)
         {
+            float warpFreq=c.Params.Float("bands.warp_freq");
+            float warpAmount=c.Params.Float("bands.warp_amount");
+            float detailFreq=c.Params.Float("bands.detail_freq");
             int w=d.Width,h=d.Height;
             CpuParallel.ForRows(h,threads,delegate(int y)
             {
@@ -119,7 +126,7 @@ namespace GasGiantNet.Sim
 
                     V2 ll=DomainMath.LonLatAt(d.Kind,x,y,w,h,d.RhoMax);
                     V3 sp=DomainMath.SpherePoint(ll);
-                    float warp=Noise3D.Fbm(sp*c.Params.Float("bands.warp_freq")+c.Static.WarpOffset,4,2.0f,0.5f)*c.Params.Float("bands.warp_amount");
+                    float warp=Noise3D.Fbm(sp*warpFreq+c.Static.WarpOffset,4,2.0f,0.5f)*warpAmount;
                     float stampLat=c.VortexStamp!=null&&c.VortexStamp.HeroEmergence
                         ? VortexStampCpu.HeroBandDeflect(sp,ll.Y,c.VortexStamp)+warp : ll.Y+warp;
                     V4 stamp=c.ProfileStamp.Sample(DomainMath.LatProfileU(stampLat));
@@ -137,7 +144,7 @@ namespace GasGiantNet.Sim
                     result.Y+=(s1+vs.Y+ws.Y-result.Y)*rk;
 
                     float fresh=0.5f+0.5f*Noise3D.Fbm(
-                        sp*(c.Params.Float("bands.detail_freq")*2.0f)+c.Static.DetailOffset.ZXY+new V3(0,c.TurbTime,0),4,2.0f,0.5f);
+                        sp*(detailFreq*2.0f)+c.Static.DetailOffset.ZXY+new V3(0,c.TurbTime,0),4,2.0f,0.5f);
                     result.Z=Glsl.Mix(result.Z,fresh,c.Replenish);
 
                     if(c.BeltReplenish>0.0f)
@@ -146,7 +153,7 @@ namespace GasGiantNet.Sim
                         if(beltm>0.02f)
                         {
                             float fine=0.5f+0.5f*Noise3D.Fbm(
-                                sp*(c.Params.Float("bands.detail_freq")*2.0f*c.BeltScale)+c.Static.DetailOffset.YXZ+new V3(c.TurbTime,0,0),3,2.0f,0.5f);
+                                sp*(detailFreq*2.0f*c.BeltScale)+c.Static.DetailOffset.YXZ+new V3(c.TurbTime,0,0),3,2.0f,0.5f);
                             result.Z=Glsl.Mix(result.Z,fine,c.BeltReplenish*beltm);
                         }
                     }

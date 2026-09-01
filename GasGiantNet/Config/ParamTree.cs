@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -9,6 +10,7 @@ namespace GasGiantNet.Config
     internal sealed class ParamTree
     {
         private readonly JsonObject _root;
+        private readonly ConcurrentDictionary<string, JsonNode> _nodeCache = new ConcurrentDictionary<string, JsonNode>();
 
         private ParamTree(JsonObject root)
         {
@@ -75,6 +77,10 @@ namespace GasGiantNet.Config
 
         private JsonNode Node(string path)
         {
+            JsonNode cached;
+            if (_nodeCache.TryGetValue(path, out cached))
+                return cached;
+
             string[] parts = path.Split('.');
             JsonNode cur = _root;
             for (int i = 0; i < parts.Length; i++)
@@ -85,6 +91,9 @@ namespace GasGiantNet.Config
                 if (!obj.TryGetPropertyValue(parts[i], out next)) throw new KeyNotFoundException(path);
                 cur = next;
             }
+
+            // ConcurrentDictionary does not accept null values.
+            if (cur != null) _nodeCache.TryAdd(path, cur);
             return cur;
         }
 
@@ -172,6 +181,7 @@ namespace GasGiantNet.Config
                 else obj = (JsonObject)n;
             }
             obj[parts[parts.Length - 1]] = value;
+            _nodeCache.Clear();
         }
 
         public string ToJson()

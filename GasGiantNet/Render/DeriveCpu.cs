@@ -68,13 +68,42 @@ namespace GasGiantNet.Render
 
             EmissionContext ec=emissionOn?BuildEmissionContext(p):null;
 
+            // Equirectangular geometry is separable: longitude depends only on
+            // X and latitude only on Y. Cache all expensive trig once per tile.
+            float[] uvX=new float[width];
+            float[] lonTable=new float[width];
+            float[] sinLon=new float[width];
+            float[] cosLon=new float[width];
+            for(int x=0;x<width;x++)
+            {
+                float u=(x+originX+0.5f)/fullWidth;
+                float lon=u*2.0f*Glsl.PI-Glsl.PI;
+                uvX[x]=u;lonTable[x]=lon;
+                sinLon[x]=MathF.Sin(lon);cosLon[x]=MathF.Cos(lon);
+            }
+
+            float[] uvY=new float[height];
+            float[] latTable=new float[height];
+            float[] sinLat=new float[height];
+            float[] cosLat=new float[height];
+            for(int y=0;y<height;y++)
+            {
+                float v=(y+originY+0.5f)/fullHeight;
+                float lat=0.5f*Glsl.PI-v*Glsl.PI;
+                uvY[y]=v;latTable[y]=lat;
+                sinLat[y]=MathF.Sin(lat);cosLat[y]=MathF.Cos(lat);
+            }
+
             CpuParallel.ForRows(height,threads,delegate(int py)
             {
                 for(int px=0;px<width;px++)
                 {
-                    V2 uv=new V2((px+originX+0.5f)/fullWidth,(py+originY+0.5f)/fullHeight);
+                    V2 uv=new V2(uvX[px],uvY[py]);
                     V4 t=sim.Equirect.Cur.SampleLinear(uv);
-                    float lat=0.5f*Glsl.PI-uv.Y*Glsl.PI;
+                    float lat=latTable[py];
+                    V3 sp=new V3(cosLat[py]*cosLon[px],
+                                 sinLat[py],
+                                 cosLat[py]*sinLon[px]);
                     float polarW=Glsl.SmoothStep(BlendLo,BlendHi,MathF.Abs(lat));
                     if(polarW>0.0f)
                     {
@@ -131,8 +160,6 @@ namespace GasGiantNet.Render
                     float laneDim=0.0f;
                     if(laneCount>0)
                     {
-                        float lon=uv.X*2.0f*Glsl.PI-Glsl.PI;
-                        V3 sp=Glsl.SpherePoint(lon,lat);
                         float warp=Noise3D.Fbm(sp*warpFreq+warpOffset,3,2.0f,0.5f)*warpAmount;
                         float wl=lat+warp;
                         float laneW=MathF.Max(0.0035f,1.5f*Glsl.PI/fullHeight);
@@ -153,9 +180,7 @@ namespace GasGiantNet.Render
                         float cscale=chromaScale;
                         if(chromaVariance>0.0f)
                         {
-                            float clon=uv.X*2.0f*Glsl.PI-Glsl.PI;float ccl=MathF.Cos(lat);
-                            V3 csp=new V3(ccl*MathF.Cos(clon),MathF.Sin(lat),ccl*MathF.Sin(clon));
-                            float drift=Noise3D.Fbm(csp*new V3(0.9f,4.0f,0.9f)+chromaOffset,3,2.0f,0.5f);
+                            float drift=Noise3D.Fbm(sp*new V3(0.9f,4.0f,0.9f)+chromaOffset,3,2.0f,0.5f);
                             cscale*=1.0f+chromaVariance*drift;
                         }
                         V3 lab=Oklab.SrgbToOklab(col);
@@ -173,9 +198,7 @@ namespace GasGiantNet.Render
                         }
                         if(hueVariance>0.0f)
                         {
-                            float hlon=uv.X*2.0f*Glsl.PI-Glsl.PI;float hcl=MathF.Cos(lat);
-                            V3 hsp=new V3(hcl*MathF.Cos(hlon),MathF.Sin(lat),hcl*MathF.Sin(hlon));
-                            float theta=hueVariance*Noise3D.Fbm(hsp*new V3(0.9f,4.0f,0.9f)+hueOffset,3,2.0f,0.5f);
+                            float theta=hueVariance*Noise3D.Fbm(sp*new V3(0.9f,4.0f,0.9f)+hueOffset,3,2.0f,0.5f);
                             float cs=MathF.Cos(theta),sn=MathF.Sin(theta);float a=lab.Y,b=lab.Z;lab.Y=a*cs-b*sn;lab.Z=a*sn+b*cs;
                         }
                         col=Oklab.OklabToSrgb(lab);
@@ -195,7 +218,7 @@ namespace GasGiantNet.Render
 
                     if(emissionOn)
                     {
-                        V4 em=EmissionPixel(sim,p,ec,uv,lat,t,dsyn,detailIntensity,warpOffset,warpFreq,warpAmount,haze);
+                        V4 em=EmissionPixel(sim,p,ec,uv,lat,sp,t,dsyn,detailIntensity,warpOffset,warpFreq,warpAmount,haze);
                         if(maskOn)
                         {
                             float emMask=Glsl.Mix(1.0f,maskValue,maskEmissionGain);
@@ -228,9 +251,9 @@ namespace GasGiantNet.Render
             return c;
         }
 
-        private static V4 EmissionPixel(CpuSimulation sim,ParamTree p,EmissionContext c,V2 uv,float lat,V4 t,float dsyn,float detailIntensity,V3 warpOffset,float warpFreq,float warpAmount,float haze)
+        private static V4 EmissionPixel(CpuSimulation sim,ParamTree p,EmissionContext c,V2 uv,float lat,V3 sp,V4 t,float dsyn,float detailIntensity,V3 warpOffset,float warpFreq,float warpAmount,float haze)
         {
-            float lon=uv.X*2.0f*Glsl.PI-Glsl.PI;float cl=MathF.Cos(lat);V3 sp=new V3(cl*MathF.Cos(lon),MathF.Sin(lat),cl*MathF.Sin(lon));V3 emis=new V3(0,0,0);
+            V3 emis=new V3(0,0,0);
             if(c.ThermalStrength>0.0f)
             {
                 float ewarp=Noise3D.Fbm(sp*warpFreq+warpOffset,3,2.0f,0.5f)*warpAmount;

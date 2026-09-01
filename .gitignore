@@ -35,3 +35,4 @@ dist/
 /.idea
 */obj
 */bin
+*.sh

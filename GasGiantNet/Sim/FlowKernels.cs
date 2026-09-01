@@ -34,6 +34,22 @@ namespace GasGiantNet.Sim
 
         public static void BuildPsiInto(SimDomain d, FlowContext c, FloatTexture target, int threads)
         {
+            // Parameters are immutable for this kernel invocation. Resolve them
+            // once rather than traversing ParamTree for every output pixel.
+            float warpFreq=c.Params.Float("bands.warp_freq");
+            float warpAmount=c.Params.Float("bands.warp_amount");
+            float heroEmergence=c.Params.Float("storms.hero_emergence");
+            float khAmplitude=c.Params.Float("turbulence.kh_amplitude");
+            float khWavenumber=c.Params.Float("turbulence.kh_wavenumber");
+            float festoonStrength=c.Params.Float("waves.festoon_strength");
+            float festoonWavenumber=c.Params.Float("waves.festoon_wavenumber");
+            float ribbonStrength=c.Params.Float("waves.ribbon_strength");
+            float ribbonWavenumber=c.Params.Float("waves.ribbon_wavenumber");
+            float turbulenceIntensity=c.Params.Float("turbulence.intensity");
+            float shearCoupling=c.Params.Float("turbulence.shear_coupling");
+            float beltBoost=c.Params.Float("turbulence.belt_boost");
+            float wakeTurbulence=c.Params.Float("storms.wake_turbulence");
+            float turbulenceScale=c.Params.Float("turbulence.scale");
             int w = d.Width, h = d.Height;
             CpuParallel.ForRows(h, threads, delegate(int y)
             {
@@ -41,7 +57,7 @@ namespace GasGiantNet.Sim
                 {
                     V2 ll = DomainMath.LonLatAt(d.Kind, x, y, w, h, d.RhoMax);
                     V3 sp = DomainMath.SpherePoint(ll);
-                    float warp = Noise3D.Fbm(sp * c.Params.Float("bands.warp_freq") + c.Static.WarpOffset, 4, 2.0f, 0.5f) * c.Params.Float("bands.warp_amount");
+                    float warp = Noise3D.Fbm(sp * warpFreq + c.Static.WarpOffset, 4, 2.0f, 0.5f) * warpAmount;
                     V4 prof = c.ProfileDyn.Sample(DomainMath.LatProfileU(ll.Y + warp));
                     float psi = prof.Y;
                     float shear = prof.Z;
@@ -63,7 +79,7 @@ namespace GasGiantNet.Sim
                             float dlon = WrapPiF(ll.X - (float)vx.Lon);
                             float along = dlon * down;
                             float across = (ll.Y - (vlat + (float)vx.WakeLatOff)) / MathF.Max(rc * 1.6f, 1e-4f);
-                            float emergence = c.HeroEmergence ? EffectiveLever(c, i, 8, c.Params.Float("storms.hero_emergence")) : 0.0f;
+                            float emergence = c.HeroEmergence ? EffectiveLever(c, i, 8, heroEmergence) : 0.0f;
                             float len = c.HeroEmergence ? Glsl.Mix(7.0f, 10.0f, emergence) : 7.0f;
                             if (along > 0.0f && along < rc * len && MathF.Abs(across) < 2.5f)
                             {
@@ -76,16 +92,16 @@ namespace GasGiantNet.Sim
 
                     if (d.Kind == DomainKind.Equirect)
                     {
-                        psi += c.Params.Float("turbulence.kh_amplitude") * 0.004f * shear * shear
-                             * MathF.Sin(c.Params.Float("turbulence.kh_wavenumber") * ll.X + c.Static.KhPhase);
-                        float fest = c.Params.Float("waves.festoon_strength");
+                        psi += khAmplitude * 0.004f * shear * shear
+                             * MathF.Sin(khWavenumber * ll.X + c.Static.KhPhase);
+                        float fest = festoonStrength;
                         if (fest > 0.0f)
                             psi += fest * 0.0045f * MathF.Exp(-Sq((ll.Y - c.FestoonLat) / 0.05f))
-                                 * MathF.Sin(c.Params.Float("waves.festoon_wavenumber") * ll.X + c.Static.FestPhase);
-                        float rib = c.Params.Float("waves.ribbon_strength");
+                                 * MathF.Sin(festoonWavenumber * ll.X + c.Static.FestPhase);
+                        float rib = ribbonStrength;
                         if (rib > 0.0f)
                             psi += rib * 0.005f * MathF.Exp(-Sq((ll.Y - c.RibbonLat) / 0.03f))
-                                 * MathF.Sin(c.Params.Float("waves.ribbon_wavenumber") * ll.X + c.Static.RibPhase);
+                                   * MathF.Sin(ribbonWavenumber * ll.X + c.Static.RibPhase);
                     }
                     else if (c.PolyAmp > 0.0f)
                     {
@@ -95,11 +111,11 @@ namespace GasGiantNet.Sim
                         psi += c.PolyAmp * MathF.Exp(-dr * dr);
                     }
 
-                    float amp = c.Params.Float("turbulence.intensity")
-                              * (1.0f + c.Params.Float("turbulence.shear_coupling") * shear)
-                              * (1.0f + (c.Params.Float("turbulence.belt_boost") - 1.0f) * belt)
-                              * (1.0f + c.Params.Float("storms.wake_turbulence") * wake);
-                    V3 tp = sp * c.Params.Float("turbulence.scale") + c.Static.TurbOffset + new V3(0.0f, 0.0f, c.TurbTime);
+                    float amp = turbulenceIntensity
+                              * (1.0f + shearCoupling * shear)
+                              * (1.0f + (beltBoost - 1.0f) * belt)
+                              * (1.0f + wakeTurbulence * wake);
+                    V3 tp = sp * turbulenceScale + c.Static.TurbOffset + new V3(0.0f, 0.0f, c.TurbTime);
                     psi += 0.0035f * amp * Noise3D.Fbm(tp, 5, 2.0f, 0.55f);
                     target.Set(x, y, 0, psi);
                 }

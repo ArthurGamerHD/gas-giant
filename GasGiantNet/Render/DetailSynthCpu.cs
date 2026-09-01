@@ -40,6 +40,20 @@ namespace GasGiantNet.Render
         public bool HeroEmergence;
         public bool Fx;
         public bool Spread;
+
+        public float Intermittency;
+        public float BeltTexture;
+        public float BeltTextureFine;
+        public float StreakMute;
+        public float SpreadAmount;
+        public float ZoneTexture;
+        public float Mottle;
+        public float HeroSpiral;
+        public float HeroCollarWrap;
+        public float PolarFilaments;
+        public float CirrusFibers;
+        public float CirrusFiberFreq;
+        public float HeroWakeBraid;
     }
 
     internal static class DetailSynthCpu
@@ -75,18 +89,59 @@ namespace GasGiantNet.Render
             float heroCalm = p.Float("detail.hero_calm");
             float spread = p.Float("detail.spread");
 
+            // Cache every parameter used from pixel/helper hot paths.
+            c.Intermittency=p.Float("detail.intermittency");
+            c.BeltTexture=p.Float("detail.belt_texture");
+            c.BeltTextureFine=p.Float("detail.belt_texture_fine");
+            c.StreakMute=p.Float("detail.streak_mute");
+            c.SpreadAmount=spread;
+            c.ZoneTexture=p.Float("detail.zone_texture");
+            c.Mottle=p.Float("detail.mottle");
+            c.HeroSpiral=p.Float("detail.hero_spiral");
+            c.HeroCollarWrap=p.Float("detail.hero_collar_wrap");
+            c.PolarFilaments=p.Float("detail.polar_filaments");
+            c.CirrusFibers=p.Float("detail.cirrus_fibers");
+            c.CirrusFiberFreq=p.Float("detail.cirrus_fiber_freq");
+            c.HeroWakeBraid=p.Float("detail.hero_wake_braid");
+
+            // Longitude is X-only and latitude is Y-only for an
+            // equirectangular tile. Avoid recalculating trig per pixel.
+            float[] eqU=new float[width];
+            float[] lon=new float[width];
+            float[] sinLon=new float[width];
+            float[] cosLon=new float[width];
+            for(int x=0;x<width;x++)
+            {
+                float u=(x+originX+0.5f)/fullWidth;
+                float l=u*2.0f*Pi-Pi;
+                eqU[x]=u;lon[x]=l;
+                sinLon[x]=MathF.Sin(l);cosLon[x]=MathF.Cos(l);
+            }
+
+            float[] eqV=new float[height];
+            float[] lat=new float[height];
+            float[] sinLat=new float[height];
+            float[] cosLat=new float[height];
+            for(int y=0;y<height;y++)
+            {
+                float v=(y+originY+0.5f)/fullHeight;
+                float l=0.5f*Pi-v*Pi;
+                eqV[y]=v;lat[y]=l;
+                sinLat[y]=MathF.Sin(l);cosLat[y]=MathF.Cos(l);
+            }
+
             CpuParallel.ForRows(height, threads, delegate(int y)
             {
                 for (int x = 0; x < width; x++)
                 {
-                    float gx = x + originX + 0.5f;
-                    float gy = y + originY + 0.5f;
-                    V2 ll = new V2(gx / fullWidth * 2.0f * Pi - Pi,
-                                   0.5f * Pi - gy / fullHeight * Pi);
-                    V3 pc = SpherePt(ll);
-                    V4 tr = sim.Equirect.Cur.SampleLinear(EqUv(ll));
+                    V2 ll=new V2(lon[x],lat[y]);
+                    V3 pc=new V3(cosLat[y]*cosLon[x],
+                                 sinLat[y],
+                                 cosLat[y]*sinLon[x]);
+                    V2 equv=new V2(eqU[x],eqV[y]);
+                    V4 tr = sim.Equirect.Cur.SampleLinear(equv);
                     V4 prof = sim.ProfileDyn.Sample(DomainMath.LatProfileU(ll.Y));
-                    V2 vel = sim.Equirect.Velocity.SampleLinear2(EqUv(ll));
+                    V2 vel = sim.Equirect.Velocity.SampleLinear2(equv);
                     float speedN = Glsl.Clamp(Glsl.Length(vel) / 1.2f, 0.0f, 1.0f);
                     float shearN = prof.Z;
                     float belt = prof.W;
@@ -148,7 +203,7 @@ namespace GasGiantNet.Render
                     float gate = 1.0f;
                     if (c.Fx)
                     {
-                        float intermittency = p.Float("detail.intermittency");
+                        float intermittency = c.Intermittency;
                         if (intermittency > 0.0f)
                         {
                             V2 llg = ll;
@@ -159,8 +214,8 @@ namespace GasGiantNet.Render
                             gate = Glsl.Mix(1.0f, 0.25f + 1.45f * Glsl.SmoothStep(-0.25f, 0.45f, g), intermittency);
                         }
                         wStreak *= gate;
-                        wStreak += p.Float("detail.belt_texture") * 0.45f * belt * gate * (1.0f - routeW);
-                        wStreak *= 1.0f - p.Float("detail.streak_mute");
+                        wStreak += c.BeltTexture * 0.45f * belt * gate * (1.0f - routeW);
+                        wStreak *= 1.0f - c.StreakMute;
                     }
                     wStreak *= calm;
 
@@ -208,17 +263,16 @@ namespace GasGiantNet.Render
         private static float ApplyFlowFx(DetailContext c, V2 ll, V3 pc, V4 tr, V2 vel, float belt, float beltPlace,
             float routeW, float driveEff, float fdCell, float fdLace, float gate, float calm, float d, float freq, float stretch, int fullWidth)
         {
-            ParamTree p = c.Params;
-            float beltTexture = p.Float("detail.belt_texture");
-            if (beltTexture > 0.0f && routeW < 1.0f && (c.Spread ? MathF.Max(belt, p.Float("detail.spread") * driveEff) : belt) > 0.02f)
+            float beltTexture = c.BeltTexture;
+            if (beltTexture > 0.0f && routeW < 1.0f && (c.Spread ? MathF.Max(belt, c.SpreadAmount * driveEff) : belt) > 0.02f)
             {
                 V2 srcF = BacktraceLl(c.Sim.Equirect.Velocity, false, ll, stretch * TauBase * 1.6f, c.Sim.Equirect.RhoMax);
                 float fold = Noise3D.Fbm(SpherePt(srcF) * (freq * 0.30f) + c.OffsetGate.YZX, 4, 2.0f, 0.5f);
                 d += 0.78f * beltTexture * fold * beltPlace * gate * (1.0f - routeW) * calm;
             }
 
-            float fineAmt = p.Float("detail.belt_texture_fine");
-            if (fineAmt > 0.0f && routeW < 1.0f && (c.Spread ? MathF.Max(belt, p.Float("detail.spread") * driveEff) : belt) > 0.02f)
+            float fineAmt = c.BeltTextureFine;
+            if (fineAmt > 0.0f && routeW < 1.0f && (c.Spread ? MathF.Max(belt, c.SpreadAmount * driveEff) : belt) > 0.02f)
             {
                 V2 s1 = BacktraceLl(c.Sim.Equirect.Velocity, false, ll, stretch * TauBase * 1.2f, c.Sim.Equirect.RhoMax);
                 V2 s2 = BacktraceLl(c.Sim.Equirect.Velocity, false, s1, stretch * TauBase * 1.2f, c.Sim.Equirect.RhoMax);
@@ -226,7 +280,7 @@ namespace GasGiantNet.Render
                 d += 0.62f * fineAmt * fold2 * beltPlace * gate * (1.0f - routeW) * calm;
             }
 
-            float zoneTexture = p.Float("detail.zone_texture");
+            float zoneTexture = c.ZoneTexture;
             float zonePlace = c.Spread ? Glsl.Mix(1.0f - belt, fdCell, driveEff) : 1.0f - belt;
             if (zoneTexture > 0.0f && routeW < 1.0f && zonePlace > 0.02f)
             {
@@ -235,7 +289,7 @@ namespace GasGiantNet.Render
                 d += 0.55f * zoneTexture * foldZ * zonePlace * gate * (1.0f - routeW);
             }
 
-            float mottle = p.Float("detail.mottle");
+            float mottle = c.Mottle;
             if (mottle > 0.0f)
             {
                 float aw = Glsl.SmoothStep(0.52f, 0.70f, MathF.Abs(ll.Y)) * (1.0f - Glsl.SmoothStep(1.10f, 1.22f, MathF.Abs(ll.Y)));
@@ -256,8 +310,8 @@ namespace GasGiantNet.Render
         private static float ApplyHeroFx(DetailContext c, V3 pc, float d, float freq)
         {
             ParamTree p = c.Params;
-            float heroSpiral = p.Float("detail.hero_spiral");
-            float collar = p.Float("detail.hero_collar_wrap");
+            float heroSpiral = c.HeroSpiral;
+            float collar = c.HeroCollarWrap;
             if (heroSpiral <= 0.0f && collar <= 0.0f) return d;
             float sp = 0.0f, spw = 0.0f;
             for (int i = 0; i < c.Heroes.Length; i++)
@@ -301,7 +355,7 @@ namespace GasGiantNet.Render
 
         private static float ApplyPolarFilaments(DetailContext c, V2 ll, float routeW, float d, float freq, float stretch)
         {
-            float amt = c.Params.Float("detail.polar_filaments");
+            float amt = c.PolarFilaments;
             if (amt <= 0.0f || routeW <= 0.0f) return d;
             SimDomain patch = ll.Y >= 0.0f ? c.Sim.North : c.Sim.South;
             V2 srcF = BacktraceLl(patch.Velocity, true, ll, stretch * TauBase * 1.15f, patch.RhoMax);
@@ -315,7 +369,7 @@ namespace GasGiantNet.Render
 
         private static float ApplyCirrus(DetailContext c, V2 ll, V3 pc, V4 tr, V2 vel, float routeW, float d, float freq, float stretch, int fullWidth)
         {
-            float amt = c.Params.Float("detail.cirrus_fibers");
+            float amt = c.CirrusFibers;
             if (amt <= 0.0f || c.Clouds.Length == 0 || routeW >= 1.0f) return d;
             V2 srcC = BacktraceLl(c.Sim.Equirect.Velocity, false, ll, stretch * TauBase * 0.7f, c.Sim.Equirect.RhoMax);
             V3 pcC = SpherePt(srcC);
@@ -339,7 +393,7 @@ namespace GasGiantNet.Render
                 V3 e1=ew/ewl,e2=Glsl.Cross(cc,e1);
                 float q=Glsl.Length(new V2(Glsl.Dot(pc,e1)/(1.8f*asp),Glsl.Dot(pc,e2)))/rc;if(q>=2.2f)continue;
                 float win=MathF.Exp(-0.8f*q*q);
-                float freqI=c.Params.Float("detail.cirrus_fiber_freq")*(0.75f+0.5f*Glsl.Fract(i*0.618034f));
+                float freqI=c.CirrusFiberFreq*(0.75f+0.5f*Glsl.Fract(i*0.618034f));
                 float wlPx=rc/freqI*fullWidth/(2.0f*Pi);float atten=Glsl.SmoothStep(1.5f,3.0f,wlPx);if(atten<=0)continue;
                 V3 f1=e1*ca+e2*sa,f2=e2*ca-e1*sa;
                 float along=Glsl.Dot(pcC,f1)/rc,across=Glsl.Dot(pcC,f2)/rc;
@@ -356,7 +410,7 @@ namespace GasGiantNet.Render
 
         private static float ApplyWakeBraid(DetailContext c,V2 ll,V3 pc,V4 tr,float routeW,float d)
         {
-            float amt=c.Params.Float("detail.hero_wake_braid");if(amt<=0||c.Heroes.Length==0||routeW>=1)return d;
+            float amt=c.HeroWakeBraid;if(amt<=0||c.Heroes.Length==0||routeW>=1)return d;
             FloatTexture tt=c.Sim.Equirect.Cur;V2 uv=EqUv(ll);float dx=1.5f/tt.Width,dy=1.5f/tt.Height;
             float tE=tt.SampleLinear(new V2(uv.X+dx,uv.Y)).X,tW=tt.SampleLinear(new V2(uv.X-dx,uv.Y)).X;
             float tN=tt.SampleLinear(new V2(uv.X,uv.Y-dy)).X,tS=tt.SampleLinear(new V2(uv.X,uv.Y+dy)).X;

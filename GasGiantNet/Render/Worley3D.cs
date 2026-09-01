@@ -5,6 +5,20 @@ namespace GasGiantNet.Render
 {
     internal static class Worley3D
     {
+        // Direct-mapped thread-local cache. A collision merely recomputes the
+        // original Hash3 value, so this cannot alter the resulting noise.
+        private const int CacheSize=4096;
+
+        private struct CacheEntry
+        {
+            public int X,Y,Z;
+            public V3 Value;
+            public bool Valid;
+        }
+
+        [ThreadStatic]
+        private static CacheEntry[] _cache;
+
         private static V3 Hash3(V3 p)
         {
             V3 q = new V3(
@@ -16,18 +30,43 @@ namespace GasGiantNet.Render
                           Glsl.Fract(MathF.Sin(q.Z) * 43758.5453123f));
         }
 
+        private static V3 FeaturePoint(int x,int y,int z)
+        {
+            CacheEntry[] cache=_cache;
+            if(cache==null)
+            {
+                cache=new CacheEntry[CacheSize];
+                _cache=cache;
+            }
+
+            int hash=unchecked(x*73856093 ^ y*19349663 ^ z*83492791);
+            int slot=hash&(CacheSize-1);
+            CacheEntry e=cache[slot];
+
+            if(e.Valid&&e.X==x&&e.Y==y&&e.Z==z)
+                return e.Value;
+
+            V3 value=Hash3(new V3(x,y,z));
+            e.X=x;e.Y=y;e.Z=z;e.Value=value;e.Valid=true;
+            cache[slot]=e;
+            return value;
+        }
+
         public static float F1(V3 p)
         {
-            V3 ip = new V3(MathF.Floor(p.X), MathF.Floor(p.Y), MathF.Floor(p.Z));
+            int ix=(int)MathF.Floor(p.X);
+            int iy=(int)MathF.Floor(p.Y);
+            int iz=(int)MathF.Floor(p.Z);
             V3 fp = new V3(Glsl.Fract(p.X), Glsl.Fract(p.Y), Glsl.Fract(p.Z));
             float f1 = 1e9f;
             for (int k = -1; k <= 1; k++)
                 for (int j = -1; j <= 1; j++)
                     for (int i = -1; i <= 1; i++)
                     {
-                        V3 g = new V3(i, j, k);
-                        V3 o = Hash3(ip + g);
-                        V3 r = g + o - fp;
+                        V3 o=FeaturePoint(ix+i,iy+j,iz+k);
+                        V3 r=new V3(i+o.X-fp.X,
+                                    j+o.Y-fp.Y,
+                                    k+o.Z-fp.Z);
                         float d = Glsl.Dot(r, r);
                         if (d < f1) f1 = d;
                     }

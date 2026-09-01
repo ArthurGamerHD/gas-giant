@@ -10,6 +10,50 @@ namespace GasGiantNet
 {
     internal static class Program
     {
+        private sealed class Profiler
+        {
+            private readonly Stopwatch _total=Stopwatch.StartNew();
+            private readonly Stopwatch _lap=Stopwatch.StartNew();
+
+            public TimeSpan Elapsed { get { return _total.Elapsed; } }
+
+            public T Measure<T>(string step,Func<T> operation)
+            {
+                Stopwatch stopwatch=Stopwatch.StartNew();
+                try{return operation();}
+                finally
+                {
+                    stopwatch.Stop();
+                    Write(step,stopwatch.Elapsed);
+                    _lap.Restart();
+                }
+            }
+
+            public void Measure(string step,Action operation)
+            {
+                Stopwatch stopwatch=Stopwatch.StartNew();
+                try{operation();}
+                finally
+                {
+                    stopwatch.Stop();
+                    Write(step,stopwatch.Elapsed);
+                    _lap.Restart();
+                }
+            }
+
+            public void Progress(string step)
+            {
+                TimeSpan elapsed=_lap.Elapsed;
+                _lap.Restart();
+                Console.WriteLine("[profile] +{0:0.000}s ({1:0.000}s total) {2}",elapsed.TotalSeconds,_total.Elapsed.TotalSeconds,step);
+            }
+
+            private void Write(string step,TimeSpan elapsed)
+            {
+                Console.WriteLine("[profile] {0}: {1:0.000}s ({2:0.000}s total)",step,elapsed.TotalSeconds,_total.Elapsed.TotalSeconds);
+            }
+        }
+
         private sealed class Options
         {
             public string Preset="jupiter_like";
@@ -31,22 +75,26 @@ namespace GasGiantNet
             try
             {
                 Options o=Parse(args);if(o.Help){PrintHelp();return 0;}
-                RandomSelfTest.Run();
+                Profiler profiler=new Profiler();
+                profiler.Measure("random self-test",delegate{RandomSelfTest.Run();});
                 if(o.SelfTest){Console.WriteLine("System.Random distribution self-test passed.");return 0;}
                 string baseDir=AppContext.BaseDirectory;
-                ParamTree p;
-                if(File.Exists(o.Preset))p=ParamTree.LoadPresetFile(o.Preset,Path.Combine(baseDir,"PresetsResolved","_defaults.json"));
-                else p=ParamTree.LoadResolvedPreset(o.Preset,baseDir);
-                if(o.Seed.HasValue)p.SetInt("seed",o.Seed.Value);
-                if(o.Resolution.HasValue)p.SetInt("export.width",o.Resolution.Value);
-                if(o.DevSteps.HasValue)p.SetInt("sim.dev_steps",o.DevSteps.Value);
-                if(o.SimulationResolution.HasValue)p.SetInt("sim.resolution",o.SimulationResolution.Value);
-                if(o.Name!=null)p.SetString("name",o.Name);
-                if(o.Compression.HasValue)p.SetInt("export.png_compression",o.Compression.Value);
-                Stopwatch sw=Stopwatch.StartNew();
-                HeadlessExporter.Run(p,o.Out,o.Threads,o.CheckpointStep,delegate(string msg){Console.WriteLine(msg);});
-                sw.Stop();
-                Console.WriteLine("exported {0}x{1} map set to {2} in {3:0.0}s",p.Int("export.width"),p.Int("export.width")/2,o.Out,sw.Elapsed.TotalSeconds);
+                ParamTree p=profiler.Measure("load preset",delegate
+                {
+                    if(File.Exists(o.Preset))return ParamTree.LoadPresetFile(o.Preset,Path.Combine(baseDir,"PresetsResolved","_defaults.json"));
+                    return ParamTree.LoadResolvedPreset(o.Preset,baseDir);
+                });
+                profiler.Measure("apply command-line overrides",delegate
+                {
+                    if(o.Seed.HasValue)p.SetInt("seed",o.Seed.Value);
+                    if(o.Resolution.HasValue)p.SetInt("export.width",o.Resolution.Value);
+                    if(o.DevSteps.HasValue)p.SetInt("sim.dev_steps",o.DevSteps.Value);
+                    if(o.SimulationResolution.HasValue)p.SetInt("sim.resolution",o.SimulationResolution.Value);
+                    if(o.Name!=null)p.SetString("name",o.Name);
+                    if(o.Compression.HasValue)p.SetInt("export.png_compression",o.Compression.Value);
+                });
+                HeadlessExporter.Run(p,o.Out,o.Threads,o.CheckpointStep,profiler.Progress);
+                Console.WriteLine("exported {0}x{1} map set to {2} in {3:0.0}s",p.Int("export.width"),p.Int("export.width")/2,o.Out,profiler.Elapsed.TotalSeconds);
                 return 0;
             }
             catch(Exception ex){Console.Error.WriteLine("error: "+ex.Message);return 2;}
